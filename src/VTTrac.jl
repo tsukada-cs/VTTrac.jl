@@ -56,7 +56,7 @@ mutable struct VTT
         o.z = z
         o.nt, o.ny, o.nx = size(z)
         if isnothing(t)
-            t = Vector{Float64}([1:o.nt;])
+            t = Vector{Float64}([0:o.nt-1;])
         end
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t

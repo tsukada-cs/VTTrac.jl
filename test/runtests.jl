@@ -23,6 +23,9 @@ using Statistics
         z = sin.(k*(xg-cx*tg)) .* cos.(k*(yg-cy*tg))
         z = Array{Float32,3}(z)
 
+        vtt = VTTrac.VTT(z)
+        @test vtt.t == tax
+
         @test_throws ArgumentError VTTrac.VTT(z, tax[begin:end-1])
         vtt = VTTrac.VTT(z, tax)
 
