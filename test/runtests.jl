@@ -46,7 +46,7 @@ using Statistics
         @test vtt.vxhw == 2.0
         @test vtt.vyhw == 2.0
         
-        VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false, subgrid_gaus=true, use_init_temp=false, peak_inside=false, score_method="xcor")
+        VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false, subgrid_gaus=true, use_init_temp=false, score_method="xcor")
         @test vtt.ixhw == 3
         @test vtt.iyhw == 3
         @test vtt.peak_inside_th == -1.0f0

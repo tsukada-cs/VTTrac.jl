@@ -32,8 +32,8 @@ mutable struct VTT
     subgrid::Bool
     subgrid_gaus::Bool #true: subgrid peak finding is by gaussian; false: e-paraboloid
     score_method::String
-    score_th0::Float64
-    score_th1::Float64
+    score_th0::AbstractFloat
+    score_th1::AbstractFloat
     peak_inside_th::Float32 #threshold for the peak-inside screening(unused if<0)
     min_contrast::Float32 # minimum contrast in the template (unused if=<0)
     use_init_temp::Bool # if true, always use initial template submimages
@@ -91,16 +91,23 @@ Setup for tracking.
 - `itstep::Integer=1`: Step of `t`'s used (skip if >1).
 - `ntrack::Integer=2`: Max tracking times from initial loc.
 - `score_method::String="xcor"`: `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
-- `score_th0::Float64=0.8`: The minimum score required for the 1st tracking.
-- `score_th1::Float64=0.7`: The minimum score required for subsequent tracking.
-- `vxch::Union{Real, Nothing}=nothing`: If non-nothing, the max tolerant vx
+- `score_th0::AbstractFloat=0.8`: The minimum score required for the 1st tracking.
+- `score_th1::AbstractFloat=0.7`: The minimum score required for subsequent tracking.
+- `vxch::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vx
     change between two consecutive tracking.
-- `vych::Union{Real, Nothing}=nothing`: If non-nothing, the max tolerant vy
+- `vych::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vy
     change between two consecutive tracking.
+- `peak_inside_th::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when
+    it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
+- `min_contrast::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
+    it has a difference in max and min greater than its value.
 """
-function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing, ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing,
-                subgrid::Bool=true, subgrid_gaus::Bool=false, itstep::Int64=1, ntrac::Int64=2, score_method="xcor", score_th0::Float64=0.8, score_th1::Float64=0.7,
-                vxch::Union{Real, Nothing}=nothing, vych::Union{Real, Nothing}=nothing, peak_inside::Bool=true, peak_inside_th::Real=0.03, min_contrast=nothing, use_init_temp::Bool=false)
+function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing,
+            ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, subgrid::Bool=true,
+            subgrid_gaus::Bool=false, itstep::Int=1, ntrac::Int=2, score_method::String="xcor",
+            score_th0::AbstractFloat=0.8, score_th1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
+            vych::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
+            min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false)
     o.nsx = nsx
     o.nsy = nsy
     if vxhw !== nothing
@@ -117,7 +124,7 @@ function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Union{Real, Nothing}=nothin
     vxch === nothing && (vxch = -999.0) # <=0 for nothing (not to set)
     vych === nothing && (vych = -999.0) # <=0 for nothing (not to set)
 
-    if !peak_inside
+    if isnothing(peak_inside_th)
         peak_inside_th = -1.0  # negative, meaning unused
     end
     peak_inside_th = Float32(peak_inside_th)
@@ -126,7 +133,6 @@ function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Union{Real, Nothing}=nothin
     end
     min_contrast = Float32(min_contrast)
     
-
     set_basic!(o, nsx, nsy, itstep, ntrac)
     set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp)
     o.setuped = true
@@ -209,20 +215,19 @@ Sets optional tracking parameters.
 - `subgrid::Bool`: Whether to conduct subgrid tracking.
 - `subgrid_gaus::Bool`: Whether subgrid peak finding is by gaussian.
 - `score_method::String`: Scoring method (such as xcor for cross-correlation).
-- `score_th0::Float64`: (Result screening parameter) Minimum score required for the first-time tracking.
-- `score_th1::Float64`: (Result screening parameter) Minimum score required for the subsequent tracking.
-- `peak_inside_th::Float64`: (Template screening parameter) If positive, an initial template is used 
-    only when it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio 
-    specified by its value.
-- `min_contrast::Float64`: (Template screening parameter) If positive, an initial template is used 
-    only when it has a difference in max and min greater than its value.
+- `score_th0::AbstractFloat`: (Result screening parameter) Minimum score required for the first-time tracking.
+- `score_th1::AbstractFloat`: (Result screening parameter) Minimum score required for the subsequent tracking.
+- `peak_inside_th::Real`: An initial template is used only when
+    it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
+- `min_contrast::Real`: An initial template is used only when 
+    it has a difference in max and min greater than its value.
 - `vxch::Float64`: (Result screening parameter) If positive, tracking result is rejected if the vx 
     chnages along trajecty greather than this value (thus used only when ntrac>=2). As a special case, 
     if the result of the second tracking is rejected, the first one is also rejected, since there is 
     no consecutive consistent result in this case.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::Float64, score_th1::Float64, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
@@ -231,7 +236,7 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
     o.peak_inside_th = Float32(peak_inside_th)
     o.min_contrast = Float32(min_contrast)
     o.vxch = vxch # unused if < 0
-    o.vych = vych
+    o.vych = vych # unused if < 0
     o.use_init_temp = use_init_temp
 end
 
@@ -734,8 +739,8 @@ Conduct tracking.
 - `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
 - `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
 - `score::Array{Float64,2}`: (len: ntrac*len) Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: (optional, if non-nothing)  (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
-- `score_arry::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) The entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+- `zss::Array{Float64,4}`: (optional, if non-`nothing`)  (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
 function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage=false, out_score_ary=false, to_missing=true)
     !o.setuped && throw(ArgumentError("Need to call #setup in advance"))
@@ -826,8 +831,8 @@ Conduct tracking (core).
 - `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
 - `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
 - `score::Array{Float64,2}`: (len: ntrac*len)  Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
-- `score_arry::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+- `zss::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
 function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary)
     len = length(tid0)
