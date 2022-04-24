@@ -1,0 +1,1005 @@
+module VTTrac
+export VTT, setup, trac
+
+using Printf
+using Statistics
+
+mutable struct VTT
+    # data on which tracking is made
+    nx::Int # image size x
+    ny::Int # image size y
+    nt::Int # time length
+    z::Array{Float32,3}
+    t::Vector{Float64}
+    dtmean::Float64
+    zmiss::Float32
+    fmiss::Float64
+    imiss::Int
+
+    # tracking parameters
+    chk_zmiss::Bool # = 0 # if true (!=0), check missing values in z (image)
+    nsx::Int # sub-image size x
+    nsy::Int # sub-image size y
+    vxhw::Float64  # velocities corresponding to ixhw throug dtmean
+    vyhw::Float64  # velocities corresponding to iyhw throug dtmean
+    ixhw::Int # max displacement x for template matching
+    iyhw::Int # max displacement y for template matching
+    vxch::Float64
+    vych::Float64
+    itstep::Int
+    ntrac::Int
+
+    subgrid::Bool
+    subgrid_gaus::Bool #true: subgrid peak finding is by gaussian; false: e-paraboloid
+    score_method::String
+    score_th0::Float64
+    score_th1::Float64
+    peak_inside_th::Float32 #threshold for the peak-inside screening(unused if<0)
+    min_contrast::Float32 # minimum contrast in the template (unused if=<0)
+    use_init_temp::Bool # if true, always use initial template submimages
+    setuped::Bool
+
+    """
+        VTT(z[, t, zmiss, fmiss, imiss])
+    
+    Sets data for tracking (you need to set parameters separately).
+    
+    # Arguments
+    - `z::Array{Float32,3}`: Array of image-like data. `z[i]` contains `i`-th image data.
+    - `t::Vector{Float64}`: Times at which the images are for.
+    - `zmiss::Float32=-999.0`: Missing value used in `z`.
+    - `fmiss::Float64=-999.0`: Missing value to be set for Float64.
+    - `imiss::Integer=-999`: Missing value to be set for Integer.
+    """
+    function VTT(z::Array{Float32,3}, t=nothing, zmiss=Float32(-999.0), fmiss=-999.0, imiss=-999)
+        o = new()
+        o.z = z
+        o.nt, o.ny, o.nx = size(z)
+        if isnothing(t)
+            t = Vector{Float64}([1:o.nt;])
+        end
+        o.t = t
+        o.dtmean = (t[end]-t[begin])/(o.nt-1)
+        o.zmiss = zmiss
+        o.fmiss = fmiss
+        o.imiss = imiss
+        o.setuped = false
+        return o
+    end
+end
+
+"""
+    setup(o, nsx, nsy, vxhw, vyhw, [ixhw, iyhw, subgrid, subgrid_gaus,
+        itstep, ntrac, score_method, score_th0, score_th1, vxch, vych,
+        peak_inside, peak_inside_th, min_contrast, use_init_temp])
+
+Setup for tracking.
+
+# Arguments
+- `o::VTT`: The object.
+- `nsx::Integer, nsy::Integer`: Submimage x & y sizes (x:1st, y:2nd dim).
+- `vxch::Float64, vyhw::Float64`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
+    the dimensions along which to perform the computation.
+    search velocity range half sizes to set `i[xy]hw`.
+    Seach at least to cover +-v?hw around the first guess or previous step.
+    (the result can be outside the range.)
+- `ixhw::Integer, iyhw::Integer`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY)
+    Max displacement fro template match (can be set indirecly through `v[xy]hw`).
+- `subgrid::Bool=true`: Whether to conduct subgrid tracking.
+- `subgrid_gaus::Bool=true`: Whether subgrid peak finding is by gaussian.
+- `itstep::Integer=1`: Step of `t`'s used (skip if >1).
+- `ntrack::Integer=2`: Max tracking times from initial loc.
+- `score_method::String="xcor"`: `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
+- `score_th0::Float64=0.8`: The minimum score required for the 1st tracking.
+- `score_th1::Float64=0.7`: The minimum score required for subsequent tracking.
+- `vxch::Union{Missing, Float64}==nothing`: If non-nothing, the max tolerant vx
+    change between two consecutive tracking.
+- `vych::Union{Missing, Float64}==nothing`: If non-nothing, the max tolerant vy
+    change between two consecutive tracking.
+"""
+function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Float64=nothing, vyhw::Float64=nothing, ixhw=nothing, iyhw=nothing,
+                subgrid::Bool=true, subgrid_gaus::Bool=false, itstep::Int64=1, ntrac::Int64=2, score_method="xcor", score_th0::Float64=0.8, score_th1::Float64=0.7,
+                vxch=nothing, vych=nothing, peak_inside::Bool=true, peak_inside_th::Float32=Float32(0.03), min_contrast=nothing, use_init_temp::Bool=false)
+    o.nsx = nsx
+    o.nsy = nsy
+    o.vxhw = vxhw
+    if vxhw !== nothing
+        ixhw !== nothing && throw(ArgumentError("`v[xy]hw` and `i[xy]hw` must not be set simultaneously"))
+        vyhw === nothing && throw(ArgumentError("vxhw and vyhw must be set simultaneously"))
+        set_ixyhw_from_v!(o, vxhw, vyhw)
+    elseif ixhw !== nothing
+        iyhw === nothing && throw(ArgumentError("ixhw and iyhw must be set simultaneously"))
+        set_ixyhw_directly!(o, ixhw, iyhw)
+    else
+        throw(ArgumentError("either `i[xy]hw` or `v[xy]hw` must be specified"))
+    end
+
+    vxch === nothing && (vxch = -999.0) # <=0 for nothing (not to set)
+    vych === nothing && (vych = -999.0) # <=0 for nothing (not to set)
+
+    if !peak_inside
+        peak_inside_th = Float32(-1.0)  # negative, meaning unused
+    end
+    if min_contrast === nothing
+        min_contrast = Float32(-1.0)   # negative, meaning unused
+    end
+    
+
+    set_basic!(o, nsx, nsy, itstep, ntrac)
+    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp)
+    o.setuped = true
+end
+
+"""
+    set_ixyhw_from_v!(o, vxch, vyxh)
+
+Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
+
+# Arguments
+- `o::VTT`: The object.
+- `vxhw::Float64`: The range over which vx is searched around initial guess.
+- `vyhw`::Float64: The range over which vy is searched around initial guess.
+```
+
+"""
+function set_ixyhw_from_v!(o::VTT, vxhw::Float64, vyhw::Float64)
+    o.vxhw = vxhw
+    o.vyhw = vyhw
+    o.ixhw = ceil(abs(vxhw * o.dtmean)) + 1 # max displacement
+    o.iyhw = ceil(abs(vyhw * o.dtmean)) + 1 # +1 is margin to find peak
+end
+
+"""
+    set_ixyhw_from_v!(o, ixch, iyxh)
+
+Sets the tracking parameters `i[xy]hw`.
+
+# Arguments
+- `o::VTT`: The object.
+- `ixhw::Float64`: The range over which next x is searched around initial guess.
+- `iyhw`::Float64: The range over which next y is searched around initial guess.
+"""
+function set_ixyhw_directly!(o::VTT, ixhw::Int, iyhw::Int)
+    o.ixhw = ixhw
+    o.iyhw = iyhw
+    o.vxhw = ixhw/o.dtmean - 1 # max displacement
+    o.vyhw = iyhw/o.dtmean - 1 # -1 is from margin to find peak
+end
+
+"""
+    set_basic!(o, nsx, nsy, itstep, ntrac)
+
+Sets basic (mandatory) tracking parameters. Also sets default vals for optional params.
+
+# Arguments
+- `o::VTT`: The object.
+- `nsx::Integer`: The template subimage size (x).
+- `nsy::Integer`: The template subimage size (y).
+- `itstep::Integer`: Index-based time step for tracking (can be negative).
+- `ntrac::Integer`: Number of times for each initial template is tracked.
+"""
+function set_basic!(o::VTT, nsx::Int, nsy::Int, itstep::Int, ntrac::Int)
+    o.nsx = nsx
+    o.nsy = nsy
+    o.itstep = itstep
+    o.ntrac = ntrac
+
+    # optional parameters (default exists)
+    o.subgrid = true
+    o.subgrid_gaus = false
+    o.score_method = "xcor"
+    o.score_th0 = 0.8
+    o.score_th1 = 0.7
+    o.peak_inside_th = Float32(0.03) # unused if < 0
+    o.min_contrast = Float32(-999.0) # unused if < 0
+    o.vxch = -999.0 # unused if < 0
+    o.vych = -999.0 # unused if < 0
+    o.use_init_temp = false
+end
+
+"""
+    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp)
+
+Sets optional tracking parameters.
+
+# Arguments
+- `o::VTT`: The object.
+- `subgrid::Bool`: Whether to conduct subgrid tracking.
+- `subgrid_gaus::Bool`: Whether subgrid peak finding is by gaussian.
+- `score_method::String`: Scoring method (such as xcor for cross-correlation).
+- `score_th0::Float64`: (Result screening parameter) Minimum score required for the first-time tracking.
+- `score_th1::Float64`: (Result screening parameter) Minimum score required for the subsequent tracking.
+- `peak_inside_th::Float64`: (Template screening parameter) If positive, an initial template is used 
+    only when it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio 
+    specified by its value.
+- `min_contrast::Float64`: (Template screening parameter) If positive, an initial template is used 
+    only when it has a difference in max and min greater than its value.
+- `vxch::Float64`: (Result screening parameter) If positive, tracking result is rejected if the vx 
+    chnages along trajecty greather than this value (thus used only when ntrac>=2). As a special case, 
+    if the result of the second tracking is rejected, the first one is also rejected, since there is 
+    no consecutive consistent result in this case.
+- `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
+"""
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::Float64, score_th1::Float64, peak_inside_th::Float32, min_contrast::Number, vxch::Float64, vych::Float64, use_init_temp::Bool)
+    o.subgrid = subgrid
+    o.subgrid_gaus = subgrid_gaus
+    o.score_method = score_method
+    o.score_th0 = score_th0
+    o.score_th1 = score_th1
+    o.peak_inside_th = peak_inside_th
+    o.min_contrast = Float32(min_contrast)
+    o.vxch = vxch # unused if < 0
+    o.vych = vych
+    o.use_init_temp = use_init_temp
+end
+
+"""To check whether a time index is valid. Returns `false` if valid, `true` if not."""
+function inspect_t_index(o::VTT, tid::Int)
+    stat = !(tid >= 1 && tid <= o.nt)
+    return stat
+end
+
+"""
+    get_zsub(o, tid, xi, yi)
+
+Read out a template subimage from the image at `tid`.
+
+The sub-image positons are specified at its center. (If the sub-image
+size is even, with one more pix on the "left" / "bottom", by starting
+from the index `xi-nsx/2`, `yi-nsy/2`).
+
+# Returns
+- `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
+no data missing), `true` if not.
+- `zsub::Array{Float32,2}`: Subimage at (x,y) = (xi, yi). 
+
+# See Also
+* [`get_zsub_view`](@ref)
+"""
+function get_zsub(o::VTT, tid::Int, xi::Int, yi::Int)
+    stat = false
+    nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
+    xi0, yi0 = xi - nsx2, yi - nsy2
+    if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
+        stat = true # sub-image is not within the original image
+        return stat, nothing
+    end
+    zs = @inbounds o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+    if o.chk_zmiss
+        stat = o.zmiss in zs
+        if stat
+            return stat, nothing
+        end
+    end
+    return stat, zs
+end
+
+"""
+    get_zsub_view(o, tid, xi, yi)
+
+Like `get_zsub`, but returns a view.
+
+# Notes
+* This function returns a view of subimage. `get_zsub` returns a copy of subimage.
+
+# See Also
+* [`get_zsub`](@ref)
+"""
+function get_zsub_view(o::VTT, tid::Int, xi::Int, yi::Int)
+    stat = false
+    nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
+    xi0, yi0 = xi - nsx2, yi - nsy2
+    if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
+        stat = true # sub-image is not within the original image
+        return stat, nothing
+    end
+    zs = @inbounds @view o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+    if o.chk_zmiss
+        stat = o.zmiss in zs
+        if stat
+            return stat, nothing
+        end
+    end
+    return stat, zs
+end
+
+"""round to Int like C/C++"""
+function roundInt(x)
+    if typeof(x) === Integer
+        return x
+    end
+    return round(Int, x, RoundNearestTiesAway)
+end
+
+"""
+    get_zsub_subgrid(o, tid, x, y)
+
+Read out a template submimage from the image at `tid`.
+Possibly at subgrid: Linearly interpolated, if
+x or y has deviation from integer (bilinear if x and y).
+Efficient: no unnecessary read-out is made.
+
+# Returns
+- `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
+no data missing), `true` if not.
+- `zsubg::Array{Float32,2}`: Subimage.
+"""
+function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
+    xi, yi = roundInt(x), roundInt(y)
+    dx, dy = x - xi, y - yi
+
+    stat, zs = get_zsub_view(o, tid, xi, yi)
+
+    if stat || (dx == 0.0 && dy == 0.0) # just on the grid
+        return stat, zs
+    end
+    
+    isx = Int(sign(dx))
+    dx = abs(dx)
+    isy = Int(sign(dy))
+    dy = abs(dy)
+
+    zsubg = zs * (1.0-dx) * (1.0-dy)
+    if isx != 0
+        stat, zsw1 = get_zsub_view(o, tid, xi+isx, yi)
+        if stat
+            return stat, nothing
+        end
+        zsubg .+= zsw1 * (dx*(1.0-dy))
+        if isy != 0
+            stat, zsw1 = get_zsub_view(o, tid, xi+isx, yi+isy)
+            if stat
+                return stat, nothing
+            end
+            zsubg .+= zsw1 * (dx*dy)
+        end
+    end
+    if isy != 0
+        stat, zsw1 = get_zsub_view(o, tid, xi, yi+isy)
+        if stat
+            return stat, nothing
+        end
+        zsubg .+= zsw1 * ((1.0-dx)*dy)
+    end
+    return stat, zsubg
+end
+
+"""
+    chk_zsub_peak_inside(o, zs)
+
+Check whether the template subimage is peaked (maximized or minimized)
+inside, and the peak is conspicuous enough, having a difference from the 
+max or min on the sides greater than peak_inside_th*(inside_max - inside_min).
+
+# Caution
+If `o.peak_inside_th` < 0, no checking is conducted.
+
+# Returns
+- `stat::Bool`: `false` if passed the check, `true` if not.
+"""
+function chk_zsub_peak_inside(o::VTT, zs)
+    stat = true
+    if o.peak_inside_th < 0
+        stat = false # do not check --> no problem
+        return stat
+    end
+
+    # find max and min along sides
+    side_max = maximum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
+    side_min = minimum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
+
+    # find max and min inside the sides
+    inner_max = maximum([zs[begin+1,begin+1:end-1]; zs[end-1,begin+1:end-1]; zs[begin+2:end-2,begin+1]; zs[begin+2:end-2,end-1]])
+    inner_min = minimum([zs[begin+1,begin+1:end-1]; zs[end-1,begin+1:end-1]; zs[begin+2:end-2,begin+1]; zs[begin+2:end-2,end-1]])
+
+    if (inner_max > side_max + o.peak_inside_th*(inner_max-inner_min) || inner_min < side_min - o.peak_inside_th*(inner_max-inner_min))
+        stat = false # OK, because the max or min is inside and the difference from the max or min on the sides is not too tiny
+    end
+    return stat
+end
+
+"""
+    chk_zmiss_region(o, tid, k0, k1, l0, l1)
+
+Check if there is data missing in the specified region at `tid`.
+
+# Returns
+- `stat::Bool`: `false` if there is no data missing, `true` if not.
+"""
+function chk_zmiss_region(o::VTT, tid, k0, k1, l0, l1)
+    return o.zmiss in o.z[tid, l0:l1, k0:k1]
+end
+
+"""
+    sliding_xcor(o, sigx, xd, tid, k0, k1, l0, l1)
+
+Sliding cross-correlation between the sugimage and image at `tid`.
+
+
+# Returns
+- `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
+    (xcor) are defined at all tested center locations; `true` if not.
+- `scr::Array{Float64,2}`: Score array.
+"""
+function sliding_xcor(o::VTT, sigx, xd, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+    nx, ny = o.nx, o.ny
+    nsx, nsy = o.nsx, o.nsy
+    nsx2, nsy2 = div(nsx,2), div(nsy,2)
+    nk = k1 - k0 + 1
+    nl = l1 - l0 + 1
+    nsxy = nsx * nsy
+    k0 = k0 - nsx2
+    l0 = l0 - nsy2
+    scr = zeros(nl,nk)
+    stat = ( k0 < 1 || k1+nsx-1 > nx || l0 < 1 || l1+nsy-1 > ny )
+    if stat
+        return stat, nothing
+    end
+    if o.chk_zmiss
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        if stat
+            return stat, nothing
+        end
+    end
+    for l = 0:nl-1
+        k = 0
+        sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+        ymean = mean(sub_at_kl)
+        yd = sub_at_kl .- ymean
+        yysum = sum(yd.^2)
+        xysum = sum(xd .* yd)
+        vyy = yysum/nsxy
+        vxy = xysum/nsxy
+        scr[l+1,k+1] = vxy/sqrt(vyy)/sigx # cross-correlataion coef
+        
+        for k = 1:nk-1
+            sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+            vyy = vyy + ymean^2 # mean(y^2) for previous k
+
+            y_left = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k-1]
+            y_right = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k+nsx-1]
+
+            ydiff = sum(y_right) - sum(y_left)
+            yydiff = sum(y_right.^2) - sum(y_left.^2)
+
+            ymean += ydiff/nsxy # ymean is renewed.
+            vyy = vyy + yydiff/nsxy - ymean^2 #new mean(y^2) - new ymean^2
+            
+            yd = sub_at_kl .- ymean
+            xysum = sum(xd .* yd)
+            vxy = xysum/nsxy
+            scr[l+1,k+1] = vxy/sqrt(vyy)/sigx # cross-correlataion coef
+        end
+    end
+    return stat, scr
+end
+
+"""
+    sliding_ncov(o, sigx, xd, tid, k0, k1, l0, l1)
+
+Sliding normalized covariance between the sugimage and image at `tid`.
+
+Normalization is done by the sigma of the fist image : cov(x',y')/sigx^2
+(in contrast to cov(x',y')/sigx/sigy in the correlation coefficient).
+
+# Returns
+- `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
+    (ncov) are defined at all tested center locations; `true` if not.
+- `scr::Array{Float64,2}`: Score array.
+"""
+function sliding_ncov(o::VTT, sigx, xd, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+    nx, ny = o.nx, o.ny
+    nsx, nsy = o.nsx, o.nsy
+    nsx2, nsy2 = div(nsx,2), div(nsy,2)
+    nk = k1 - k0 + 1
+    nl = l1 - l0 + 1
+    nsxy = nsx * nsy
+    sigx2 = sigx^2
+    k0 = k0 - nsx2
+    l0 = l0 - nsy2
+    scr = zeros(nl,nk)
+    stat = ( k0 < 1 || k1+nsx-1 > nx || l0 < 1 || l1+nsy-1 > ny )
+    if stat
+        return stat, nothing
+    end
+    if o.chk_zmiss
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        if stat
+            return stat, nothing
+        end
+    end
+    for l = 0:nl-1
+        k = 0
+        sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+        ymean = mean(sub_at_kl)
+        yd = sub_at_kl .- ymean
+        xysum = sum(xd .* yd)
+        vxy = xysum/nsxy
+        scr[l+1,k+1] = vxy/sigx2
+
+        for k = 1:nk-1
+            sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+
+            y_left = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k-1]
+            y_right = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k+nsx-1]
+            ydiff = sum(y_right) - sum(y_left)
+
+            ymean = ymean + ydiff/nsxy # ymean is renewed.
+            yd = sub_at_kl .- ymean
+            xysum = sum(xd .* yd)
+            vxy = xysum/nsxy
+            scr[l+1,k+1] = vxy/sigx2
+        end
+    end
+    return stat, scr
+end
+
+"""
+    get_score_xcor(o, x, tid, k0, k1, l0, l1)
+
+Conduct template matching, scoring by cross-correlation.
+
+# Returns
+- `stat::Bool`: `false` if passed the check, `true` if not.
+"""
+function get_score_xcor(o::VTT, x, tid, k0, k1, l0, l1)
+    xm = mean(x)
+    xd = x .- xm
+    sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
+    # sigx = stdm(x, xm) # if use stdm, std is computed as sqrt(sum(xd.^2)/(n-1))
+    stat, scr = sliding_xcor(o, sigx, xd, tid, k0, k1, l0, l1)    
+    return stat, scr
+end
+
+"""
+    get_score_ncov(o, x, tid, k0, k1, l0, l1)
+
+Conduct template matching, scoring by normalized covariance.
+
+# Returns
+- `stat::Bool`: `false` if passed the check, `true` if not.
+"""
+function get_score_ncov(o::VTT, x, tid, k0, k1, l0, l1)
+    xm = mean(x)
+    xd = x .- xm
+    sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
+    # sigx = stdm(x, xm) # if use stdm, std is computed as sqrt(sum(xd.^2)/(n-1))
+    stat, scr = sliding_ncov(o, sigx, xd, tid, k0, k1, l0, l1)
+    return stat, scr
+end
+
+"""Conduct template matching driver."""
+function get_score(o::VTT, zs0, tid, k0, k1, l0, l1)
+    if o.score_method == "xcor"
+        stat, scr = get_score_xcor(o, zs0, tid, k0, k1, l0, l1)
+    elseif o.score_method == "ncov"
+        stat, scr = get_score_ncov(o, zs0, tid, k0, k1, l0, l1)
+    else
+        stat = true
+        return stat, nothing
+    end
+   return stat, scr
+end
+
+"""
+    find_subgrid_peak_5pt_epara(c, l, r, b, t)
+
+Find subgrid peak from 5 points with elliptic paraboloid.
+
+Input c(enter), l(eft), r(ight), b(ottom), t(op) at
+(0,0), (-1,0), (0,1), (0,-1), (0,1), respectively.
+c must be greater than any of l,r,b,t.
+
+Equation: z = -p(x-x0)^2 + -q(y-y0)^2 + r
+            = -p x^2 + 2p x0 x - q y^2 + 2q y0 y + c
+
+, where u = p x0, v = q y0, c = -p x0^2 - q y0^2 + r
+
+# Returns
+- `stat::Bool`: `false` if find peak successfully, `true` if not.
+- `x0::float`: x of peak the location.
+- `y0::float`: y of peak the location.
+
+"""
+function find_subgrid_peak_5pt_epara(c, l, r, b, t)
+    l = l-c
+    r = r-c
+    b = b-c
+    t = t-c
+    stat = !( l<=0.0 && r<=0.0 && b<=0.0 && t<=0.0 && ( l<0.0 || r<0.0 ) && ( b<0.0 || t<0.0) )
+    if stat
+        return stat, nothing, nothing, nothing
+    end
+    p = -(l+r)/2.0
+    q = -(b+t)/2.0
+    x0 = (r-l)/4p # --> |x0| < 0.5, if c >= [l,r,b,t] > 0
+    y0 = (t-b)/4q # --> |y0| < 0.5, if c >= [l,r,b,t] > 0
+    max_scr = c + p * x0^2 + q * y0^2 # r= c + p x0^2 + q y0^2
+    return stat, x0, y0, max_scr
+end
+
+"""
+    find_subgrid_peak_5pt_gaus(c, l, r, b, t)
+
+Find subgrid peak from 5 points by interpolating with a 2D gaussian (for positive scores).
+
+It is simply a log-version of the elliptic-paraboloid method
+(`find_subgrid_peak_5pt_epara`). It appears that this method is
+preferred in many PIVs over the elliptic-paraboloid method
+(`find_subgrid_peak_5pt_epara`). In a test, there were not much
+difference between them, though.
+
+Input c(enter), l(eft), r(ight), b(ottom), t(op) at
+(0,0), (-1,0), (0,1), (0,-1), (0,1), respectively.
+all of them must be positive.
+c must be greater than any of l,r,b,t.
+"""
+function find_subgrid_peak_5pt_gaus(c, l, r, b, t)
+    stat = !( c>0.0 && l>0.0 && r>0.0 && b>0.0 && t>0.0 ) # all must be >0
+    if stat
+        return stat, nothing, nothing, nothing
+    end
+    c = log(c)
+    l = log(l) - c
+    r = log(r) - c
+    b = log(b) - c
+    t = log(t) - c
+    stat = !( l<=0.0 && r<=0.0 && b<=0.0 && t<=0.0 && ( l<0.0 || r<0.0 ) && ( b<0.0 || t<=0.0) )
+    if stat
+        return stat, nothing, nothing, nothing
+    end
+    p = -(l+r)/2.0
+    q = -(b+t)/2.0
+    x0 = (r-l)/4p # --> |x0| < 0.5, if c >= [l,r,b,t] > 0
+    y0 = (t-b)/4q # --> |y0| < 0.5, if c >= [l,r,b,t] > 0
+    max_scr = exp(c + p * x0^2 + q * y0^2)
+    return stat, x0, y0, max_scr
+end
+
+
+"""print a 2D double array"""
+function print_ary2d(a)
+    for j = 1:size(a)[1]
+        for i = 1:size(a)[2]
+            @printf("%2.2f", a[j,i])
+            print(" ")
+        end
+        print("\n")
+    end
+end
+
+
+"""
+    find_score_peak(o, scr, kw, lw)
+
+Find the score peak and its location.
+
+# Returns
+- `stat::Bool`: `false` if the peak is inside; `true` if not.
+- `kpi::Float64`: the peak location x.
+- `lpi::Float64`: the peak location y.
+- `scrp::Float64`: the peak score.
+"""
+function find_score_peak(o::VTT, scr, kw, lw)
+    # find the max and its index
+    l_and_k = findlast(x->x==maximum(scr), scr)
+    scrp = scr[l_and_k]
+    lpi, kpi = l_and_k[1], l_and_k[2]
+
+    # whether on the sides or not
+    stat = ( kpi==1 || kpi==kw || lpi==1 || lpi == lw)
+    if stat
+        return stat, nothing, nothing, nothing
+    end
+    
+    # subgrid determination
+    if o.subgrid
+        if o.subgrid_gaus
+            stat, kp, lp, scrp = find_subgrid_peak_5pt_gaus(scr[lpi,kpi], scr[lpi,kpi-1], scr[lpi,kpi+1], scr[lpi-1,kpi], scr[lpi+1,kpi]) #[kl]p: relative to [kl]pi
+        else
+            stat, kp, lp, scrp = find_subgrid_peak_5pt_epara(scr[lpi,kpi], scr[lpi,kpi-1], scr[lpi,kpi+1], scr[lpi-1,kpi], scr[lpi+1,kpi]) #[kl]p: relative to [kl]pi
+        end
+        if stat
+            return stat, nothing, nothing, nothing
+        end
+        kpi += kp
+        lpi += lp
+    end
+    return stat, kpi, lpi, scrp
+end
+
+"""
+    trac(o, tid, x, y[, vxg, vyg, out_subimage, out_score_ary])
+
+Conduct tracking.
+
+# Arguments
+- `o::VTT`: The traking oject.
+- `tid::Array{Integer,Any}`: Tracking initial time indices.
+- `x::Array{Float64,Any}`: Tracking initial template-center x location (index-based; non-integer for subgrid).
+- `y::Array{Float64,Any}`: Tracking initial template-center y location (index-based; non-integer for subgrid).
+- `vx0g::Array{Float64,Any}=nothing`: First guess of vx (to search around it). Can be 0.
+- `vy0g::Array{Float64,Any}=nothing`: First guess of vy (to search around it). Can be 0.
+- `out_subimage::Bool=false`: Whether output subimages.
+- `out_score_ary::Bool=false`: Whether output score arrays.
+- `to_missing::Bool=true`: Whether output missing values as `missing`.
+
+# Returns
+- `count::Array{Float64,2}`: (len: len)The number of successful tracking for each initial template.
+- `tid::Array{Float64,2}`: (len: (ntrac+1)*len) time index of the trajectories (tid0 and subsequent ones).
+- `x::Array{Float64,2}`: (len: (ntrac+1)*len) x locations of the trajectories (x0 and derived ones).
+- `y::Array{Float64,2}`: (len: (ntrac+1)*len) y locations of trajectories (x0 and derived ones).
+- `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
+- `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
+- `score::Array{Float64,2}`: (len: ntrac*len) Scores along the trajectory (max values, possibly at subgrid).
+- `zss::Array{Float64,4}`: (optional, if non-nothing)  (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_arry::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) The entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+"""
+function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage=false, out_score_ary=false, to_missing=true)
+    !o.setuped && throw(ArgumentError("Need to call #setup in advance"))
+    sh = size(x)
+    if typeof(tid) === Int64
+        tid = fill(tid, sh...)
+    else
+        size(tid) !== sh && throw(ArgumentError("Shape miss-match (x)"))
+    end
+
+    size(y) != sh && throw(ArgumentError("Shape miss-match (y)"))
+    
+    if isnothing(vxg)
+        vxg = zeros(sh...)
+    else
+        size(vxg) !== sh && throw(ArgumentError("Shape miss-match (vxg)"))
+    end
+
+    if isnothing(vyg)
+        vyg = zeros(sh...)
+    else
+        size(vyg) !== sh && throw(ArgumentError("Shape miss-match (vyg)"))
+    end
+
+    count, tid, x, y, vx, vy, score, zss, score_ary = do_tracking(o, vec(tid), vec(x), vec(y), vec(vxg), vec(vyg), out_subimage, out_score_ary)
+
+    if to_missing
+        fmiss = o.fmiss
+        imiss = o.imiss
+        tid = Array{Union{Missing, Int},2}(tid)
+        tid[tid.==imiss] .= missing
+        x = Array{Union{Missing, Float64},2}(x)
+        x[x.==fmiss] .= missing
+        y = Array{Union{Missing, Float64},2}(y)
+        y[y.==fmiss] .= missing
+        vx = Array{Union{Missing, Float64},2}(vx)
+        vx[vx.==fmiss] .= missing
+        vy = Array{Union{Missing, Float64},2}(vy)
+        vy[vy.==fmiss] .= missing
+        score = Array{Union{Missing, Float64},2}(score)
+        score[score.==fmiss] .= missing
+        zss = Array{Union{Missing, Float64},4}(zss)
+        zss[zss.==o.zmiss] .= missing
+        score_ary = Array{Union{Missing, Float64},4}(score_ary)
+        score_ary[score_ary.==fmiss] .= missing
+    end
+
+    if length(sh) >= 2
+        # reshape outputs based on the shape of inputs
+        count = reshape(count, sh...)
+        tid = reshape(tid, size(tid)[1], sh...)
+        x = reshape(x, size(x)[1], sh...)
+        y = reshape(y, size(y)[1], sh...)
+        vx = reshape(vx, size(vx)[1], sh...)
+        vy = reshape(vy, size(vy)[1], sh...)
+        score = reshape(score, size(score)[1], sh...)
+        if out_subimage
+            zss = reshape(zss, size(zss)[1:end-1]..., sh...)
+        end
+        if out_score_ary
+            score_ary = reshape(score_ary, size(score_ary)[1:end-1]..., sh...)
+        end
+    end
+    return count, tid, x, y, vx, vy, score, zss, score_ary
+end
+
+
+"""
+    do_tracking(o, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary)
+
+Conduct tracking (core).
+
+# Arguments
+- `o::VTT`: The traking oject.
+- `tid0::Vector{Integer}`: Tracking initial time indices.
+- `x0::Vector{Float64}`: Tracking initial template-center x location (index-based; non-integer for subgrid).
+- `y0::Vector{Float64}`: Tracking initial template-center y location (index-based; non-integer for subgrid).
+- `vx0g::Vector{Float64}`: First guess of vx (to search around it). Can be 0.
+- `vy0g::Vector{Float64}`: First guess of vy (to search around it). Can be 0.
+- `out_subimage::Bool`: Whether output subimages.
+- `out_score_ary::Bool`: Whether output score arrays.
+
+# Returns
+- `count::Array{Float64,2}`: (len: len) The number of successful tracking for each initial template.
+- `tid::Array{Float64,2}`: (len: (ntrac+1)*len) Time index of the trajectories (tid0 and subsequent ones).
+- `x::Array{Float64,2}`: (len: (ntrac+1)*len) x locations of the trajectories (x0 and derived ones).
+- `y::Array{Float64,2}`: (len: (ntrac+1)*len) y locations of trajectories (x0 and derived ones).
+- `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
+- `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
+- `score::Array{Float64,2}`: (len: ntrac*len)  Scores along the trajectory (max values, possibly at subgrid).
+- `zss::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_arry::Array{Float64,4}`: (optional, if non-nothing) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+"""
+function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary)
+    len = length(tid0)
+    fmiss = o.fmiss
+    imiss = o.imiss
+
+    length(x0) != len && throw(ArgumentError("invalid x0 length"))
+    length(y0) != len && throw(ArgumentError("invalid y0 length"))
+    length(vx0) != len && throw(ArgumentError("invalid vx0 length"))
+    length(vy0) != len && throw(ArgumentError("invalid vy0 length"))
+
+    shape0 = [o.ntrac, len]
+    shape1 = [o.ntrac+1, len]
+    count = zeros(Int, len)
+    tid = fill(imiss, shape1...)
+    x = fill(fmiss, shape1...)
+    y = fill(fmiss, shape1...)
+    vx = fill(fmiss, shape0...)
+    vy = fill(fmiss, shape0...)
+    score = fill(fmiss, shape0...)
+    zs0 = fill(o.zmiss, o.nsy, o.nsx)
+
+    if out_subimage
+        shape2 = [o.nsy, o.nsx, o.ntrac+1, len]
+        zss = zeros(shape2...)
+    else
+        zss = nothing
+    end
+
+    if out_score_ary
+        shape2 = [2o.iyhw+1, 2o.ixhw+1, o.ntrac, len]
+        score_ary = zeros(shape2...)
+    else
+        score_ary = nothing
+    end
+
+    ixhw = o.ixhw
+    iyhw = o.iyhw
+    kw = 2ixhw + 1
+    lw = 2iyhw + 1
+    t = o.t
+    itstep = o.itstep
+    chk_vchange = (o.vxch > 0.0 && o.vych > 0.0)
+
+    alive = trues(len)
+    if !out_score_ary
+        scr = zeros(lw, kw)
+    end
+
+    # record initial data
+    if o.subgrid # initial position
+        x[1,:] .= x0[:]
+        y[1,:] .= y0[:]
+    else
+        x[1,:] .= roundInt.(x0[:])
+        y[1,:] .= roundInt.(y0[:])
+    end
+    tid[1,:] .= tid0[:]
+
+    for m = 1:len
+        for j = 1:o.ntrac
+            if !alive[m]
+                continue
+            end
+        
+            xcur = x[j,m] # x current
+            ycur = y[j,m] # y current
+
+            # record initial data
+            tidf = tid0[m] + (j-1)*itstep  # index of the tracking start time
+            tidl = tidf + itstep      # index of the tracking end time
+            stat = inspect_t_index(o, tidf)
+            if stat
+                alive[m] = false; println("Checkpoint 1, m=",m)
+                continue
+            end
+            if j == 1 || !o.use_init_temp 
+                stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
+            end
+            if stat
+                alive[m] = false; println("Checkpoint 2, m=",m)
+                continue
+            end
+
+            if o.min_contrast > 0.0
+                if maximum(zs0) - minimum(zs0) < o.min_contrast
+                    alive[m] = false; println("Checkpoint 3, m=",m)
+                    continue
+                end
+            end
+
+            if o.peak_inside_th > 0.0
+                stat = chk_zsub_peak_inside(o, zs0)
+                if stat
+                    alive[m] = false; println("Checkpoint 4, m=",m)
+                    continue
+                end
+            end
+
+            if out_subimage
+                if j == 1 || !o.use_init_temp
+                    zss[:,:,j,m] = zs0
+                else
+                    stat, zsw = get_zsub_subgrid(o, tidf, xcur, ycur)
+                    zss[:,:,j,m] = zsw
+                end
+            end
+
+            # inspect the tracking end time
+            stat = inspect_t_index(o, tidl)
+            if stat
+                alive[m] = false; println("Checkpoint 5, m=",m)
+                continue
+            end
+            dt = t[tidl] - t[tidf] # time diff. can be negative
+            if j == 1
+                vxg = vx0[m]
+                vyg = vy0[m]
+            else 
+                vxg = vx[j-1,m] # previous result
+                vyg = vy[j-1,m] # previous result
+            end
+            kc = roundInt(xcur + vxg*dt)
+            lc = roundInt(ycur + vyg*dt)
+
+            stat, scr = get_score(o, zs0, tidl, kc-ixhw, kc+ixhw, lc-iyhw, lc+iyhw)
+            alive[m] = !stat
+            if stat
+                alive[m] = false; println("Checkpoint 6, m=",m)
+                continue
+            end
+            score_ary[:,:,j,m] .= scr
+
+            # print_dary2d("**score", "%7.3f", scr, kw, lw );
+            stat, xp, yp, sp = find_score_peak(o, scr, kw, lw)
+            if stat
+                alive[m] = false; println("Checkpoint 7, m=",m)
+                continue
+            end
+            if ((j==1 && sp<o.score_th0) || (j>1 && sp<o.score_th1))
+                alive[m] = false; println("Checkpoint 8, m=",m)
+                continue
+            end
+            score[j,m] = sp
+            xw = xp + kc - 1 - ixhw # next position (x-axis)
+            yw = yp + lc - 1 - iyhw # next position (y-axis)
+            vxw = (xw - x[j,m])/dt # velocity (x-axis)
+            vyw = (yw - y[j,m])/dt # velocity (y-axis)
+            if chk_vchange && j > 1
+                stat = (abs(vxw - vx[j-1,m]) > o.vxch || abs(vyw - vy[j-1,m]) > o.vych)
+                if stat
+                    if j == 2 # invalidate the j==1 results too
+                        count[m] = 0
+                        x[1,m] = y[1,m] = o.fmiss
+                        vx[1,m] = vy[1,m] = o.fmiss
+                    end
+                    alive[m] = false; println("Checkpoint 9, m=",m)
+                    continue
+                end
+            end
+            count[m] = j + 1 # of valid tracking
+            tid[j+1,m] = tidl
+            x[j+1,m] = xw
+            y[j+1,m] = yw
+            vx[j,m] = vxw
+            vy[j,m] = vyw
+            if out_subimage && j == o.ntrac # last sub image
+                xcur = x[j+1,m]
+                ycur = y[j+1,m]
+                stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
+                zss[:,:,j+1,m] = zs0
+            end
+        end
+    end   
+    return count, tid, x, y, vx, vy, score, zss, score_ary
+end
+end
