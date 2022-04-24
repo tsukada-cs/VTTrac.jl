@@ -51,7 +51,7 @@ mutable struct VTT
     - `fmiss::Float64=-999.0`: Missing value to be set for Float64.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}, t=nothing, zmiss=Float32(-999.0), fmiss=-999.0, imiss=-999)
+    function VTT(z::Array{Float32,3}, t=nothing, zmiss::Float=-999.0, fmiss::Float=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
@@ -60,7 +60,7 @@ mutable struct VTT
         end
         o.t = t
         o.dtmean = (t[end]-t[begin])/(o.nt-1)
-        o.zmiss = zmiss
+        o.zmiss = Float32(zmiss)
         o.fmiss = fmiss
         o.imiss = imiss
         o.setuped = false
