@@ -39,6 +39,8 @@ using Statistics
         nsx = 5
         nsy = 5
 
+        @test_throws ArgumentError VTTrac.setup(vtt, nsx, nsy)
+        @test_throws ArgumentError VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ixhw=3, iyhw=3)
         VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false,
                     subgrid_gaus=true, use_init_temp=false, peak_inside=false, score_method="xcor")
         

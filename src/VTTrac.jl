@@ -51,7 +51,7 @@ mutable struct VTT
     - `fmiss::Float64=-999.0`: Missing value to be set for Float64.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}, t=nothing, zmiss::Number=-999.0, fmiss::Number=-999.0, imiss::Int=-999)
+    function VTT(z::Array{Float32,3}, t=nothing, zmiss::Real=-999.0, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
@@ -79,12 +79,12 @@ Setup for tracking.
 # Arguments
 - `o::VTT`: The object.
 - `nsx::Integer, nsy::Integer`: Submimage x & y sizes (x:1st, y:2nd dim).
-- `vxch::Float64, vyhw::Float64`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
+- `vxch::Union{Real, Nothing}, vyhw::Union{Real, Nothing}`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
     the dimensions along which to perform the computation.
     search velocity range half sizes to set `i[xy]hw`.
     Seach at least to cover +-v?hw around the first guess or previous step.
     (the result can be outside the range.)
-- `ixhw::Integer, iyhw::Integer`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY)
+- `ixhw::Union{Int, Nothing}, iyhw::Union{Int, Nothing}`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY)
     Max displacement fro template match (can be set indirecly through `v[xy]hw`).
 - `subgrid::Bool=true`: Whether to conduct subgrid tracking.
 - `subgrid_gaus::Bool=true`: Whether subgrid peak finding is by gaussian.
@@ -93,17 +93,16 @@ Setup for tracking.
 - `score_method::String="xcor"`: `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
 - `score_th0::Float64=0.8`: The minimum score required for the 1st tracking.
 - `score_th1::Float64=0.7`: The minimum score required for subsequent tracking.
-- `vxch::Union{Missing, Float64}==nothing`: If non-nothing, the max tolerant vx
+- `vxch::Union{Real, Nothing}=nothing`: If non-nothing, the max tolerant vx
     change between two consecutive tracking.
-- `vych::Union{Missing, Float64}==nothing`: If non-nothing, the max tolerant vy
+- `vych::Union{Real, Nothing}=nothing`: If non-nothing, the max tolerant vy
     change between two consecutive tracking.
 """
-function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Float64=nothing, vyhw::Float64=nothing, ixhw=nothing, iyhw=nothing,
+function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing, ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing,
                 subgrid::Bool=true, subgrid_gaus::Bool=false, itstep::Int64=1, ntrac::Int64=2, score_method="xcor", score_th0::Float64=0.8, score_th1::Float64=0.7,
-                vxch=nothing, vych=nothing, peak_inside::Bool=true, peak_inside_th::Float32=Float32(0.03), min_contrast=nothing, use_init_temp::Bool=false)
+                vxch::Union{Real, Nothing}=nothing, vych::Union{Real, Nothing}=nothing, peak_inside::Bool=true, peak_inside_th::Real=0.03, min_contrast=nothing, use_init_temp::Bool=false)
     o.nsx = nsx
     o.nsy = nsy
-    o.vxhw = vxhw
     if vxhw !== nothing
         ixhw !== nothing && throw(ArgumentError("`v[xy]hw` and `i[xy]hw` must not be set simultaneously"))
         vyhw === nothing && throw(ArgumentError("vxhw and vyhw must be set simultaneously"))
@@ -119,11 +118,13 @@ function setup(o::VTT, nsx::Int64, nsy::Int64; vxhw::Float64=nothing, vyhw::Floa
     vych === nothing && (vych = -999.0) # <=0 for nothing (not to set)
 
     if !peak_inside
-        peak_inside_th = Float32(-1.0)  # negative, meaning unused
+        peak_inside_th = -1.0  # negative, meaning unused
     end
-    if min_contrast === nothing
-        min_contrast = Float32(-1.0)   # negative, meaning unused
+    peak_inside_th = Float32(peak_inside_th)
+    if isnothing(min_contrast)
+        min_contrast = -1.0   # negative, meaning unused
     end
+    min_contrast = Float32(min_contrast)
     
 
     set_basic!(o, nsx, nsy, itstep, ntrac)
@@ -221,13 +222,13 @@ Sets optional tracking parameters.
     no consecutive consistent result in this case.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::Float64, score_th1::Float64, peak_inside_th::Float32, min_contrast::Number, vxch::Float64, vych::Float64, use_init_temp::Bool)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::Float64, score_th1::Float64, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
     o.score_th0 = score_th0
     o.score_th1 = score_th1
-    o.peak_inside_th = peak_inside_th
+    o.peak_inside_th = Float32(peak_inside_th)
     o.min_contrast = Float32(min_contrast)
     o.vxch = vxch # unused if < 0
     o.vych = vych
