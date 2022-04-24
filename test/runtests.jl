@@ -41,14 +41,17 @@ using Statistics
 
         @test_throws ArgumentError VTTrac.setup(vtt, nsx, nsy)
         @test_throws ArgumentError VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ixhw=3, iyhw=3)
-        VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false,
-                    subgrid_gaus=true, use_init_temp=false, peak_inside=false, score_method="xcor")
         
+        VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3)
+        @test vtt.vxhw == 2.0
+        @test vtt.vyhw == 2.0
+        
+        VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false, subgrid_gaus=true, use_init_temp=false, peak_inside=false, score_method="xcor")
         @test vtt.ixhw == 3
         @test vtt.iyhw == 3
         @test vtt.peak_inside_th == -1.0f0
         @test vtt.min_contrast == -1.0f0
-        
+
         n = 6
         tid0 = Vector{Int}(ones(n))
         x0 = 1 .+ [0:n-1;]*2.5 .+ 7.5
