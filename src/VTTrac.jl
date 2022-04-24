@@ -58,6 +58,7 @@ mutable struct VTT
         if isnothing(t)
             t = Vector{Float64}([1:o.nt;])
         end
+        size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
         o.dtmean = (t[end]-t[begin])/(o.nt-1)
         o.zmiss = Float32(zmiss)
