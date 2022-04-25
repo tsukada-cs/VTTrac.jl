@@ -733,24 +733,24 @@ Conduct tracking.
 - `tid::Array{Integer,Any}`: Tracking initial time indices.
 - `x::Array{Float64,Any}`: Tracking initial template-center x location (index-based; non-integer for subgrid).
 - `y::Array{Float64,Any}`: Tracking initial template-center y location (index-based; non-integer for subgrid).
-- `vx0g::Array{Float64,Any}=nothing`: First guess of vx (to search around it). Can be 0.
-- `vy0g::Array{Float64,Any}=nothing`: First guess of vy (to search around it). Can be 0.
+- `vxg::Array{Float64,Any}=nothing`: First guess of vx (to search around it). Can be 0.
+- `vyg::Array{Float64,Any}=nothing`: First guess of vy (to search around it). Can be 0.
 - `out_subimage::Bool=false`: Whether output subimages.
 - `out_score_ary::Bool=false`: Whether output score arrays.
 - `to_missing::Bool=true`: Whether output missing values as `missing`.
 
 # Returns
-- `count::Array{Float64,2}`: (len: len)The number of successful tracking for each initial template.
-- `tid::Array{Float64,2}`: (len: (ntrac+1)*len) time index of the trajectories (tid0 and subsequent ones).
-- `x::Array{Float64,2}`: (len: (ntrac+1)*len) x locations of the trajectories (x0 and derived ones).
-- `y::Array{Float64,2}`: (len: (ntrac+1)*len) y locations of trajectories (x0 and derived ones).
-- `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
-- `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
-- `score::Array{Float64,2}`: (len: ntrac*len) Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: (optional, if non-`nothing`)  (Diagnosis output if wanted) The subimages along the
-    track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
-- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The entire scores
-    (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+- `count::Vector{Integer}`: [len] The number of successful tracking for each initial template.
+- `tid::Array{Float64,2}`: [ntrac+1, len] time index of the trajectories (tid0 and subsequent ones).
+- `x::Array{Float64,2}`: [ntrac+1, len] x locations of the trajectories (x0 and derived ones).
+- `y::Array{Float64,2}`: [ntrac+1, len] y locations of trajectories (x0 and derived ones).
+- `vx::Array{Float64,2}`: [ntrac, len] Derived x-velocity.
+- `vy::Array{Float64,2}`: [ntrac, len] Derived y-velocity.
+- `score::Array{Float64,2}`: [ntrac, len] Scores along the trajectory (max values, possibly at subgrid).
+- `zss::Array{Float64,4}`: [nsx, nsy, ntrac+1, len] (optional, if non-`nothing`)
+    (Diagnosis output if wanted) The subimages along the track.
+- `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] (optional, if non-`nothing`)
+    (Diagnosis output if wanted) The entire scores.
 """
 function trac(o::VTT, tid, x, y;
         vxg=nothing, vyg=nothing, out_subimage::Bool=false, out_score_ary::Bool=false, to_missing::Bool=true)
