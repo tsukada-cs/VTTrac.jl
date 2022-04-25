@@ -5,7 +5,7 @@ using Statistics
 
 @testset "VTTrac.jl" begin
     @testset "VTTrack_original" begin
-        nt = 30
+        nt = 10
         ny = 100
         nx = 100
         tax = Vector{Float64}([0:nt-1;])
@@ -25,14 +25,16 @@ using Statistics
 
         vtt = VTTrac.VTT(z)
         @test vtt.t == tax
+        @test vtt.chk_zmiss == false
 
-        @test_throws ArgumentError VTTrac.VTT(z, tax[begin:end-1])
-        vtt = VTTrac.VTT(z, tax)
-
+        @test_throws ArgumentError VTTrac.VTT(z, t=tax[begin:end-1])
+        vtt = VTTrac.VTT(z, t=tax, zmiss=-999.0)
+        
         @test vtt.nt == nt
         @test vtt.ny == ny
         @test vtt.nx == nx
         @test vtt.dtmean == 1
+        @test vtt.chk_zmiss == true
         @test vtt.setuped == false
 
         ntrac = nt-1
@@ -61,8 +63,8 @@ using Statistics
 
         @test vtt.z == z # Check to see if the view is being written.
         
-        @test count == fill(30, 6)
-        @test tid == repeat([1:30;]', 6)'
+        @test count == fill(nt, 6)
+        @test tid == repeat([1:nt;]', 6)'
         @test mean(vx) == 1.0
         @test mean(vy) == 1.0
         @test size(count) == (n,)
@@ -95,8 +97,12 @@ using Statistics
 
         vtt.subgrid = true
         count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
-
+        
         @test 1.19 < mean(vx) < 1.21
         @test 1.19 < mean(vy) < 1.21
+
+        vtt.peak_inside_th = 0.03
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test count == [5 0 6; 0 0 0]
     end
 end

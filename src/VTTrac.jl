@@ -51,7 +51,7 @@ mutable struct VTT
     - `fmiss::Real=-999.0`: Missing value to be set for Real.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}, t::Union{Vector{Float64}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
+    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
