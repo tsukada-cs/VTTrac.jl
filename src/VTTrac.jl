@@ -4,6 +4,8 @@ export VTT, setup, trac
 using Printf
 using Statistics
 
+import Logging
+
 mutable struct VTT
     # data on which tracking is made
     nx::Int # image size x
@@ -912,20 +914,23 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
             tidl = tidf + itstep      # index of the tracking end time
             stat = inspect_t_index(o, tidf)
             if stat
-                alive[m] = false; println("Checkpoint 1, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 1 (during `inspect_t_index` of `tidf`)"
                 continue
             end
             if j == 1 || !o.use_init_temp 
                 stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
             end
             if stat
-                alive[m] = false; println("Checkpoint 2, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
                 continue
             end
 
             if o.min_contrast > 0.0
                 if maximum(zs0) - minimum(zs0) < o.min_contrast
-                    alive[m] = false; println("Checkpoint 3, m=",m)
+                    alive[m] = false
+                    @info "(m=$m) Stop tracking at checkpoint 3 (during `min_contrast` check)"
                     continue
                 end
             end
@@ -933,7 +938,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
             if o.peak_inside_th > 0.0
                 stat = chk_zsub_peak_inside(o, zs0)
                 if stat
-                    alive[m] = false; println("Checkpoint 4, m=",m)
+                    alive[m] = false
+                    @info "(m=$m) Stop tracking at checkpoint 4 (during `chk_zsub_peak_inside`)"
                     continue
                 end
             end
@@ -950,7 +956,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
             # inspect the tracking end time
             stat = inspect_t_index(o, tidl)
             if stat
-                alive[m] = false; println("Checkpoint 5, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
                 continue
             end
             dt = t[tidl] - t[tidf] # time diff. can be negative
@@ -967,7 +974,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
             stat, scr = get_score(o, zs0, tidl, kc-ixhw, kc+ixhw, lc-iyhw, lc+iyhw)
             alive[m] = !stat
             if stat
-                alive[m] = false; println("Checkpoint 6, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
                 continue
             end
             score_ary[:,:,j,m] .= scr
@@ -975,11 +983,13 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
             # print_dary2d("**score", "%7.3f", scr, kw, lw );
             stat, xp, yp, sp = find_score_peak(o, scr, kw, lw)
             if stat
-                alive[m] = false; println("Checkpoint 7, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 7 (during `find_score_peak`)"
                 continue
             end
             if ((j==1 && sp<o.score_th0) || (j>1 && sp<o.score_th1))
-                alive[m] = false; println("Checkpoint 8, m=",m)
+                alive[m] = false
+                @info "(m=$m) Stop tracking at checkpoint 8 (during `score_th0` or `score_th1` check)"
                 continue
             end
             score[j,m] = sp
@@ -995,7 +1005,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary
                         x[1,m] = y[1,m] = o.fmiss
                         vx[1,m] = vy[1,m] = o.fmiss
                     end
-                    alive[m] = false; println("Checkpoint 9, m=",m)
+                    alive[m] = false
+                    @info "(m=$m) Stop tracking at checkpoint 9 (during `chk_vchange`)"
                     continue
                 end
             end
