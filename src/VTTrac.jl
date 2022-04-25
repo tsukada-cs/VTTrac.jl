@@ -17,11 +17,11 @@ mutable struct VTT
     imiss::Int
 
     # tracking parameters
-    chk_zmiss::Bool # = 0 # if true (!=0), check missing values in z (image)
+    chk_zmiss::Bool # if true, check missing values in `z` (image)
     nsx::Int # sub-image size x
     nsy::Int # sub-image size y
-    vxhw::Float64  # velocities corresponding to ixhw throug dtmean
-    vyhw::Float64  # velocities corresponding to iyhw throug dtmean
+    vxhw::Float64  # velocities corresponding to `ixhw` through `dtmean`
+    vyhw::Float64  # velocities corresponding to `iyhw` through `dtmean`
     ixhw::Int # max displacement x for template matching
     iyhw::Int # max displacement y for template matching
     vxch::Float64
@@ -45,13 +45,13 @@ mutable struct VTT
     Sets data for tracking (you need to set parameters separately).
     
     # Arguments
-    - `z::Array{Float32,3}`: Array of image-like data. `z[i]` contains `i`-th image data.
+    - `z::Array{Float32,3}`: Array of image-like data (in dimensions [time, y, x]). `z[i]` contains `i`-th image data.
     - `t::Vector{Float64}`: Times at which the images are for.
-    - `zmiss::Float32=-999.0`: Missing value used in `z`.
-    - `fmiss::Float64=-999.0`: Missing value to be set for Float64.
+    - `zmiss::Union{Real, Nothing}=nothing`: Missing value used in `z`.
+    - `fmiss::Real=-999.0`: Missing value to be set for Real.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}, t=nothing, zmiss::Real=-999.0, fmiss::Real=-999.0, imiss::Int=-999)
+    function VTT(z::Array{Float32,3}, t::Union{Vector{Float64}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
@@ -61,7 +61,13 @@ mutable struct VTT
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
         o.dtmean = (t[end]-t[begin])/(o.nt-1)
-        o.zmiss = Float32(zmiss)
+        if isnothing(zmiss)
+            o.chk_zmiss = false
+            o.zmiss = Float32(0.0)
+        else
+            o.chk_zmiss = true
+            o.zmiss = Float32(zmiss)
+        end
         o.fmiss = fmiss
         o.imiss = imiss
         o.setuped = false

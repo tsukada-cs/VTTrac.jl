@@ -63,8 +63,8 @@ using Statistics
         
         @test count == fill(30, 6)
         @test tid == repeat([1:30;]', 6)'
-        @test mean(vx) == 1
-        @test mean(vy) == 1
+        @test mean(vx) == 1.0
+        @test mean(vy) == 1.0
         @test size(count) == (n,)
         @test size(tid) == (ntrac+1, n)
         @test size(x) == (ntrac+1, n)
