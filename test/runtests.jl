@@ -61,7 +61,7 @@ using Statistics
         y0 = 1 .+ [0:n-1;]*1.0 .+ 10.5
         count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test vtt.z == z # Check to see if the view is being written.
-        @test count == fill(nt, 6)
+        @test count == fill(nt, n)
         @test tid == repeat([1:nt;]', 6)'
         @test mean(vx) == 1.0
         @test mean(vy) == 1.0
@@ -74,7 +74,39 @@ using Statistics
         @test size(score) == (ntrac, n)
         @test size(zss) == (nsy, nsx, ntrac+1, n)
         @test size(score_ary) == (2vtt.iyhw+1, 2vtt.ixhw+1, ntrac, n)
-        
+
+
+        vtt.subgrid = true
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test 1.19 < mean(vx) < 1.21
+        @test 1.19 < mean(vy) < 1.21
+
+
+        vtt.min_contrast = 1.6
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test count !== fill(nt, n)
+        vtt.min_contrast = -1.0
+
+
+        vtt.score_method = "ncov"
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test 1.19 < mean(vx) < 1.21
+        @test 1.19 < mean(vy) < 1.21
+        vtt.score_method = "xcor"
+
+
+        vtt.peak_inside_th = 0.03
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test count !== fill(nt, n)
+        vtt.peak_inside_th = -1.0
+
+
+        vtt.use_init_temp = true
+        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test 1.19 < mean(vx) < 1.21
+        @test 1.19 < mean(vy) < 1.21
+        vtt.use_init_temp = false
+
 
         n1 = 2
         n2 = 3
@@ -91,23 +123,5 @@ using Statistics
         @test size(score) == (ntrac, n1, n2)
         @test size(zss) == (nsy, nsx, ntrac+1, n1, n2)
         @test size(score_ary) == (2vtt.iyhw+1, 2vtt.ixhw+1, ntrac, n1, n2)
-
-
-        vtt.subgrid = true
-        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
-        @test 1.19 < mean(vx) < 1.21
-        @test 1.19 < mean(vy) < 1.21
-
-
-        vtt.score_method = "ncov"
-        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
-        @test 1.19 < mean(vx) < 1.21
-        @test 1.19 < mean(vy) < 1.21
-
-
-        vtt.score_method = "xcor"
-        vtt.peak_inside_th = 0.03
-        count, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
-        @test count == [5 0 6; 0 0 0]
     end
 end
