@@ -747,10 +747,13 @@ Conduct tracking.
 - `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
 - `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
 - `score::Array{Float64,2}`: (len: ntrac*len) Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: (optional, if non-`nothing`)  (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
-- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+- `zss::Array{Float64,4}`: (optional, if non-`nothing`)  (Diagnosis output if wanted) The subimages along the
+    track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The entire scores
+    (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
-function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage=false, out_score_ary=false, to_missing=true)
+function trac(o::VTT, tid, x, y;
+        vxg=nothing, vyg=nothing, out_subimage::Bool=false, out_score_ary::Bool=false, to_missing::Bool=true)
     !o.setuped && throw(ArgumentError("Need to call #setup in advance"))
     sh = size(x)
     if typeof(tid) === Int64
