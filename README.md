@@ -6,7 +6,7 @@
 [![Coverage](https://codecov.io/gh/tsukada-cs/VTTrac.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/tsukada-cs/VTTrac.jl)
 
 ## VTTrac: Velocimetry by Template Tracking
-This library provides the julia-language implementation for VTTtrac (https://github.com/thorinouchi/VTTrac). It does not use module variables, so it should be good for parallel execution.
+This library provides the julia-language implementation for VTTrac (https://github.com/thorinouchi/VTTrac). It does not use module variables, so it should be good for parallel execution.
 
 The algorithm used in this library is the simple template matching of PIV (particle image velocimetry) for monochromatic image-like data, but the matching is conducted multiple times in a Lagrangian manner as in PTV (particle tracking velocimetry) over a number of times specified by the parameter named `ntrac`. The default scoring method for template matching is the cross correlation coefficient, as in the basic PIV.
 
