@@ -23,3 +23,4 @@ Spatial coordinates are based on array indices, with the distance between adjace
 
 ### References
 * `VTTrac` by Takeshi Horinouchi: https://github.com/thorinouchi/VTTrac
+* `pyVTTrac` by Taiga Tsukada: https://github.com/tsukada-cs/pyVTTrac
