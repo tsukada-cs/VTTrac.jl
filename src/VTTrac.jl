@@ -421,7 +421,7 @@ Check if there is data missing in the specified region at `tid`.
 # Returns
 - `stat::Bool`: `false` if there is no data missing, `true` if not.
 """
-function chk_zmiss_region(o::VTT, tid, k0, k1, l0, l1)
+function chk_zmiss_region(o::VTT, tid, k0::Int, k1::Int, l0::Int, l1::Int)
     return o.zmiss in o.z[tid, l0:l1, k0:k1]
 end
 
@@ -557,7 +557,7 @@ Conduct template matching, scoring by cross-correlation.
 # Returns
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
-function get_score_xcor(o::VTT, x, tid, k0, k1, l0, l1)
+function get_score_xcor(o::VTT, x, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
     sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
@@ -574,7 +574,7 @@ Conduct template matching, scoring by normalized covariance.
 # Returns
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
-function get_score_ncov(o::VTT, x, tid, k0, k1, l0, l1)
+function get_score_ncov(o::VTT, x, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
     sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
@@ -584,7 +584,7 @@ function get_score_ncov(o::VTT, x, tid, k0, k1, l0, l1)
 end
 
 """Conduct template matching driver."""
-function get_score(o::VTT, zs0, tid, k0, k1, l0, l1)
+function get_score(o::VTT, zs0, tid, k0::Int, k1::Int, l0::Int, l1::Int)
     if o.score_method == "xcor"
         stat, scr = get_score_xcor(o, zs0, tid, k0, k1, l0, l1)
     elseif o.score_method == "ncov"
@@ -616,7 +616,7 @@ Equation: z = -p(x-x0)^2 + -q(y-y0)^2 + r
 - `y0::float`: y of peak the location.
 
 """
-function find_subgrid_peak_5pt_epara(c, l, r, b, t)
+function find_subgrid_peak_5pt_epara(c::Real, l::Real, r::Real, b::Real, t::Real)
     l = l-c
     r = r-c
     b = b-c
@@ -649,7 +649,7 @@ Input c(enter), l(eft), r(ight), b(ottom), t(op) at
 all of them must be positive.
 c must be greater than any of l,r,b,t.
 """
-function find_subgrid_peak_5pt_gaus(c, l, r, b, t)
+function find_subgrid_peak_5pt_gaus(c::Real, l::Real, r::Real, b::Real, t::Real)
     stat = !( c>0.0 && l>0.0 && r>0.0 && b>0.0 && t>0.0 ) # all must be >0
     if stat
         return stat, nothing, nothing, nothing
@@ -695,7 +695,7 @@ Find the score peak and its location.
 - `lpi::Float64`: the peak location y.
 - `scrp::Float64`: the peak score.
 """
-function find_score_peak(o::VTT, scr, kw, lw)
+function find_score_peak(o::VTT, scr, kw::Int, lw::Int)
     # find the max and its index
     l_and_k = findlast(x->x==maximum(scr), scr)
     scrp = scr[l_and_k]
@@ -845,7 +845,7 @@ Conduct tracking (core).
 - `zss::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
 - `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
-function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage, out_score_ary)
+function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_score_ary::Bool)
     len = length(tid0)
     fmiss = o.fmiss
     imiss = o.imiss
