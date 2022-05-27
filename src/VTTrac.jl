@@ -752,8 +752,7 @@ Conduct tracking.
 - `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] (optional, if non-`nothing`)
     (Diagnosis output if wanted) The entire scores.
 """
-function trac(o::VTT, tid, x, y;
-        vxg=nothing, vyg=nothing, out_subimage::Bool=false, out_score_ary::Bool=false, to_missing::Bool=true)
+function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=false, out_score_ary::Bool=false, to_missing::Bool=true)
     !o.setuped && throw(ArgumentError("Need to call #setup in advance"))
     sh = size(x)
     if typeof(tid) === Int64
@@ -981,7 +980,9 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
                 continue
             end
-            score_ary[:,:,j,m] .= scr
+            if out_score_ary
+                score_ary[:,:,j,m] .= scr
+            end
 
             # print_dary2d("**score", "%7.3f", scr, kw, lw );
             stat, xp, yp, sp = find_score_peak(o, scr, kw, lw)
