@@ -146,6 +146,43 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
     o.setuped = true
 end
 
+function set_nsx(o::VTT, value::Int)
+    o.nsx = value
+end
+function set_nsy(o::VTT, value::Int)
+    o.nsy = value
+end
+function set_itstep(o::VTT, value::Int)
+    o.itstep = value
+end
+function set_ntrac(o::VTT, value::Int)
+    o.ntrac = value
+end
+function set_subgrid(o::VTT, value::Bool)
+    o.subgrid = value
+end
+function set_subgrid_gaus(o::VTT, value::Bool)
+    o.subgrid_gaus = value
+end
+function set_score_method(o::VTT, value::String)
+    o.score_method = value
+end
+function set_score_th0(o::VTT, value::Real)
+    o.score_th0 = value
+end
+function set_score_th1(o::VTT, value::Real)
+    o.score_th1 = value
+end
+function set_peak_inside_th(o::VTT, value::Real)
+    o.peak_inside_th = value
+end
+function set_min_contrast(o::VTT, value::Real)
+    o.min_contrast = value
+end
+function set_use_init_temp(o::VTT, value::Bool)
+    o.use_init_temp = value
+end
+
 """
     set_ixyhw_from_v!(o, vxch, vyxh)
 
