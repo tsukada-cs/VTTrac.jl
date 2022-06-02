@@ -954,7 +954,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             stat = inspect_t_index(o, tidf)
             if stat
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 1 (during `inspect_t_index` of `tidf`)"
+                # @info "(m=$m) Stop tracking at checkpoint 1 (during `inspect_t_index` of `tidf`)"
                 continue
             end
             if j == 1 || !o.use_init_temp 
@@ -962,14 +962,14 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             end
             if stat
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
+                # @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
                 continue
             end
 
             if o.min_contrast > 0.0
                 if maximum(zs0) - minimum(zs0) < o.min_contrast
                     alive[m] = false
-                    @info "(m=$m) Stop tracking at checkpoint 3 (during `min_contrast` check)"
+                    # @info "(m=$m) Stop tracking at checkpoint 3 (during `min_contrast` check)"
                     continue
                 end
             end
@@ -978,7 +978,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 stat = chk_zsub_peak_inside(o, zs0)
                 if stat
                     alive[m] = false
-                    @info "(m=$m) Stop tracking at checkpoint 4 (during `chk_zsub_peak_inside`)"
+                    # @info "(m=$m) Stop tracking at checkpoint 4 (during `chk_zsub_peak_inside`)"
                     continue
                 end
             end
@@ -996,7 +996,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             stat = inspect_t_index(o, tidl)
             if stat
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
+                # @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
                 continue
             end
             dt = t[tidl] - t[tidf] # time diff. can be negative
@@ -1014,7 +1014,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             alive[m] = !stat
             if stat
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
+                # @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
                 continue
             end
             if out_score_ary
@@ -1025,12 +1025,12 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             stat, xp, yp, sp = find_score_peak(o, scr, kw, lw)
             if stat
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 7 (during `find_score_peak`)"
+                # @info "(m=$m) Stop tracking at checkpoint 7 (during `find_score_peak`)"
                 continue
             end
             if ((j==1 && sp<o.score_th0) || (j>1 && sp<o.score_th1))
                 alive[m] = false
-                @info "(m=$m) Stop tracking at checkpoint 8 (during `score_th0` or `score_th1` check)"
+                # @info "(m=$m) Stop tracking at checkpoint 8 (during `score_th0` or `score_th1` check)"
                 continue
             end
             score[j,m] = sp
@@ -1047,7 +1047,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                         vx[1,m] = vy[1,m] = o.fmiss
                     end
                     alive[m] = false
-                    @info "(m=$m) Stop tracking at checkpoint 9 (during `chk_vchange`)"
+                    # @info "(m=$m) Stop tracking at checkpoint 9 (during `chk_vchange`)"
                     continue
                 end
             end
