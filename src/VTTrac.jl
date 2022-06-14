@@ -904,14 +904,14 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
     zs0 = fill(o.zmiss, o.nsy, o.nsx)
 
     if out_subimage
-        shape2 = [o.nsy, o.nsx, o.ntrac+1, len]
+        shape2 = [o.ntrac+1, o.nsy, o.nsx, len]
         zss = zeros(shape2...)
     else
         zss = nothing
     end
 
     if out_score_ary
-        shape2 = [2o.iyhw+1, 2o.ixhw+1, o.ntrac, len]
+        shape2 = [o.ntrac, 2o.iyhw+1, 2o.ixhw+1, len]
         score_ary = zeros(shape2...)
     else
         score_ary = nothing
@@ -986,10 +986,10 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
 
             if out_subimage
                 if j == 1 || !o.use_init_temp
-                    zss[:,:,j,m] = zs0
+                    zss[j,:,:,m] = zs0
                 else
                     stat, zsw = get_zsub_subgrid(o, tidf, xcur, ycur)
-                    zss[:,:,j,m] = zsw
+                    zss[j,:,:,m] = zsw
                 end
             end
 
@@ -1018,7 +1018,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
             if out_score_ary
-                score_ary[:,:,j,m] .= scr
+                score_ary[j,:,:,m] .= scr
             end
 
             # print_dary2d("**score", "%7.3f", scr, kw, lw );
@@ -1061,7 +1061,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 xcur = x[j+1,m]
                 ycur = y[j+1,m]
                 stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
-                zss[:,:,j+1,m] = zs0
+                zss[j+1,:,:,m] = zs0
             end
         end
     end   

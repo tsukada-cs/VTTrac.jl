@@ -73,8 +73,8 @@ using Statistics
         @test size(vx) == (ntrac, n)
         @test size(vy) == (ntrac, n)
         @test size(score) == (ntrac, n)
-        @test size(zss) == (nsy, nsx, ntrac+1, n)
-        @test size(score_ary) == (2vtt.iyhw+1, 2vtt.ixhw+1, ntrac, n)
+        @test size(zss) == (ntrac+1, nsy, nsx, n)
+        @test size(score_ary) == (ntrac, 2vtt.iyhw+1, 2vtt.ixhw+1, n)
 
 
         vtt.subgrid = true
@@ -86,6 +86,7 @@ using Statistics
         vtt.min_contrast = 1.6
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test count !== fill(nt, n)
+        @test 3 in status
         vtt.min_contrast = -1.0
 
 
@@ -123,7 +124,7 @@ using Statistics
         @test size(vx) == (ntrac, n1, n2)
         @test size(vy) == (ntrac, n1, n2)
         @test size(score) == (ntrac, n1, n2)
-        @test size(zss) == (nsy, nsx, ntrac+1, n1, n2)
-        @test size(score_ary) == (2vtt.iyhw+1, 2vtt.ixhw+1, ntrac, n1, n2)
+        @test size(zss) == (ntrac+1, nsy, nsx, n1, n2)
+        @test size(score_ary) == (ntrac, 2vtt.iyhw+1, 2vtt.ixhw+1, n1, n2)
     end
 end
