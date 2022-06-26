@@ -356,7 +356,7 @@ function get_zsub_view(o::VTT, tid::Int, xi::Int, yi::Int)
 end
 
 """round to Int like C/C++"""
-function roundInt(x)
+function roundInt(x::Real)
     if typeof(x) === Integer
         return x
     end
