@@ -773,7 +773,7 @@ Interpolate 2d values by bilinear interpolation
 # Returns
 - `z_interp`: Interpolated values.
 """
-function interp_2d(z, is, js)
+function interp_2ds(z, is, js)
     ni, nj = size(z)
     i0 = Int.(floor.(is))
     j0 = Int.(floor.(js))
@@ -785,7 +785,7 @@ function interp_2d(z, is, js)
     i1j0 = CartesianIndex.(min.(i0.+1, ni), j0)
     i0j1 = CartesianIndex.(i0, min.(j0.+1, nj))
     i1j1 = CartesianIndex.(min.(i0.+1, ni), min.(j0.+1, nj))
-    z_interp = di1 .* dj1 .* z[i0j0] .+ di0 .* dj1 .* z[i1j0] .+ di1 .* dj0 .* z[i0j1] .+ di0 .* dj0 .* z[i1j1]
+    z_interp = @inbounds di1 .* dj1 .* z[i0j0] .+ di0 .* dj1 .* z[i1j0] .+ di1 .* dj0 .* z[i0j1] .+ di0 .* dj0 .* z[i1j1]
     return z_interp
 end
 
@@ -813,7 +813,7 @@ function interp_2d(z, i, j)
     dj0 = j - j0
     di1 = 1 - di0
     dj1 = 1 - dj0
-    z_interp = @inbounds di1*dj1*z[i0,j0] + di0* dj1*z[i1,j0] + di1*dj0*z[i0,j1] + di0*dj0*z[i1,j1]
+    z_interp = @inbounds di1*dj1*z[i0,j0] + di0*dj1*z[i1,j0] + di1*dj0*z[i0,j1] + di0*dj0*z[i1,j1]
     return z_interp
 end
 
