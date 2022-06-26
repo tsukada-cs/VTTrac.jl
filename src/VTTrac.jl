@@ -739,7 +739,7 @@ function find_score_peak(o::VTT, scr, kw::Int, lw::Int)
     lpi, kpi = l_and_k[1], l_and_k[2]
 
     # whether on the sides or not
-    stat = ( kpi==1 || kpi==kw || lpi==1 || lpi == lw)
+    stat = ( kpi==1 || kpi==kw || lpi==1 || lpi==lw)
     if stat
         return stat, nothing, nothing, nothing
     end
@@ -759,6 +759,36 @@ function find_score_peak(o::VTT, scr, kw::Int, lw::Int)
     end
     return stat, kpi, lpi, scrp
 end
+
+"""
+    interp_2d(z, i, j)
+
+Interpolate 2d values by bilinear interpolation
+
+# Arguments
+- `z`: 2d array.
+- `i`: 1st index. It can be vector.
+- `j`: 2nd index. It can be vector.
+
+# Returns
+- `z_interp`: Interpolated values.
+"""
+function interp_2d(z, i, j)
+    ni, nj = size(z)
+    i0 = Int.(floor.(i))
+    j0 = Int.(floor.(j))
+    di0 = i - i0
+    dj0 = j - j0
+    di1 = 1 .- di0
+    dj1 = 1 .- dj0
+    i0j0 = CartesianIndex.(i0, j0)
+    i1j0 = CartesianIndex.(min.(i0.+1, ni), j0)
+    i0j1 = CartesianIndex.(i0, min.(j0.+1, nj))
+    i1j1 = CartesianIndex.(min.(i0.+1, ni), min.(j0.+1, nj))
+    z_interp = di1 .* dj1 .* z[i0j0] .+ di0 .* dj1 .* z[i1j0] .+ di1 .* dj0 .* z[i0j1] .+ di0 .* dj0 .* z[i1j1]
+    return z_interp
+end
+
 
 """
     trac(o, tid, x, y[, vxg, vyg, out_subimage, out_score_ary])
@@ -812,7 +842,7 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
         size(vyg) !== sh && throw(ArgumentError("Shape miss-match (vyg)"))
     end
 
-    count, status, tid, x, y, vx, vy, score, zss, score_ary = do_tracking(o, vec(tid), vec(x), vec(y), vec(vxg), vec(vyg), out_subimage, out_score_ary)
+    count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary = do_tracking(o, vec(tid), vec(x), vec(y), vec(vxg), vec(vyg), out_subimage, out_score_ary)
 
     if to_missing
         fmiss = o.fmiss
@@ -842,6 +872,7 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
         tid = reshape(tid, size(tid)[1], sh...)
         x = reshape(x, size(x)[1], sh...)
         y = reshape(y, size(y)[1], sh...)
+        ztraj = reshape(ztraj, size(ztraj)[1], sh...)
         vx = reshape(vx, size(vx)[1], sh...)
         vy = reshape(vy, size(vy)[1], sh...)
         score = reshape(score, size(score)[1], sh...)
@@ -852,7 +883,7 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
             score_ary = reshape(score_ary, size(score_ary)[1:end-1]..., sh...)
         end
     end
-    return count, status, tid, x, y, vx, vy, score, zss, score_ary
+    return count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary
 end
 
 
@@ -884,6 +915,7 @@ Conduct tracking (core).
 """
 function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_score_ary::Bool)
     len = length(tid0)
+    zmiss = o.zmiss
     fmiss = o.fmiss
     imiss = o.imiss
 
@@ -898,6 +930,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
     tid = fill(imiss, shape1...)
     x = fill(fmiss, shape1...)
     y = fill(fmiss, shape1...)
+    ztraj = fill(zmiss, shape1...)
     vx = fill(fmiss, shape0...)
     vy = fill(fmiss, shape0...)
     score = fill(fmiss, shape0...)
@@ -939,6 +972,9 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
         y[1,:] .= roundInt.(y0[:])
     end
     tid[1,:] .= tid0[:]
+    for (i, (xi, yi, tidi)) in enumerate(zip(x0, y0, tid0))
+        ztraj[1,i] = interp_2d(o.z[tidi,:,:], yi, xi)
+    end
 
     for m = 1:len
         for j = 1:o.ntrac
@@ -1055,6 +1091,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             tid[j+1,m] = tidl
             x[j+1,m] = xw
             y[j+1,m] = yw
+            ztraj[j+1,m] = interp_2d(o.z[tidl,:,:], yw, xw)
             vx[j,m] = vxw
             vy[j,m] = vyw
             if out_subimage && j == o.ntrac # last sub image
@@ -1065,6 +1102,6 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             end
         end
     end   
-    return count, status, tid, x, y, vx, vy, score, zss, score_ary
+    return count, status, tid, x, y, ztraj, vx, vy, score, zss, score_ary
 end
 end
