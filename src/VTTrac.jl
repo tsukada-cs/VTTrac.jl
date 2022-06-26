@@ -303,7 +303,7 @@ from the index `xi-nsx/2`, `yi-nsy/2`).
 # Returns
 - `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
 no data missing), `true` if not.
-- `zsub::Array{Float32,2}`: Subimage at (x,y) = (xi, yi). 
+- `zsub::Matrix{Float32}`: Subimage at (x,y) = (xi, yi). 
 
 # See Also
 * [`get_zsub_view`](@ref)
@@ -374,7 +374,7 @@ Efficient: no unnecessary read-out is made.
 # Returns
 - `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
 no data missing), `true` if not.
-- `zsubg::Array{Float32,2}`: Subimage.
+- `zsubg::Matrix{Float32}`: Subimage.
 """
 function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     xi, yi = roundInt(x), roundInt(y)
@@ -431,7 +431,7 @@ If `o.peak_inside_th` < 0, no checking is conducted.
 # Returns
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
-function chk_zsub_peak_inside(o::VTT, zs)
+function chk_zsub_peak_inside(o::VTT, zs::AbstractMatrix{Float32})
     stat = true
     if o.peak_inside_th < 0
         stat = false # do not check --> no problem
@@ -460,7 +460,7 @@ Check if there is data missing in the specified region at `tid`.
 # Returns
 - `stat::Bool`: `false` if there is no data missing, `true` if not.
 """
-function chk_zmiss_region(o::VTT, tid, k0::Int, k1::Int, l0::Int, l1::Int)
+function chk_zmiss_region(o::VTT, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     return o.zmiss in o.z[tid, l0:l1, k0:k1]
 end
 
@@ -473,9 +473,9 @@ Sliding cross-correlation between the sugimage and image at `tid`.
 # Returns
 - `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
     (xcor) are defined at all tested center locations; `true` if not.
-- `scr::Array{Float64,2}`: Score array.
+- `scr::Matrix{Float64}`: Score array.
 """
-function sliding_xcor(o::VTT, sigx, xd, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     nx, ny = o.nx, o.ny
     nsx, nsy = o.nsx, o.nsy
     nsx2, nsy2 = div(nsx,2), div(nsy,2)
@@ -539,9 +539,9 @@ Normalization is done by the sigma of the fist image : cov(x',y')/sigx^2
 # Returns
 - `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
     (ncov) are defined at all tested center locations; `true` if not.
-- `scr::Array{Float64,2}`: Score array.
+- `scr::Matrix{Float64}`: Score array.
 """
-function sliding_ncov(o::VTT, sigx, xd, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+function sliding_ncov(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     nx, ny = o.nx, o.ny
     nsx, nsy = o.nsx, o.nsy
     nsx2, nsy2 = div(nsx,2), div(nsy,2)
@@ -596,7 +596,7 @@ Conduct template matching, scoring by cross-correlation.
 # Returns
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
-function get_score_xcor(o::VTT, x, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+function get_score_xcor(o::VTT, x::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
     sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
@@ -613,7 +613,7 @@ Conduct template matching, scoring by normalized covariance.
 # Returns
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
-function get_score_ncov(o::VTT, x, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+function get_score_ncov(o::VTT, x::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
     sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
@@ -734,7 +734,7 @@ Find the score peak and its location.
 - `lpi::Float64`: the peak location y.
 - `scrp::Float64`: the peak score.
 """
-function find_score_peak(o::VTT, scr::Array{Float64,2}, kw::Int, lw::Int)
+function find_score_peak(o::VTT, scr::Matrix{Float64}, kw::Int, lw::Int)
     # find the max and its index
     l_and_k = findlast(x->x==maximum(scr), scr)
     scrp = scr[l_and_k]
@@ -781,12 +781,12 @@ Conduct tracking.
 
 # Returns
 - `count::Vector{Integer}`: [len] The number of successful tracking for each initial template.
-- `tid::Array{Float64,2}`: [ntrac+1, len] time index of the trajectories (tid0 and subsequent ones).
-- `x::Array{Float64,2}`: [ntrac+1, len] x locations of the trajectories (x0 and derived ones).
-- `y::Array{Float64,2}`: [ntrac+1, len] y locations of trajectories (x0 and derived ones).
-- `vx::Array{Float64,2}`: [ntrac, len] Derived x-velocity.
-- `vy::Array{Float64,2}`: [ntrac, len] Derived y-velocity.
-- `score::Array{Float64,2}`: [ntrac, len] Scores along the trajectory (max values, possibly at subgrid).
+- `tid::Matrix{Float64}`: [ntrac+1, len] time index of the trajectories (tid0 and subsequent ones).
+- `x::Matrix{Float64}`: [ntrac+1, len] x locations of the trajectories (x0 and derived ones).
+- `y::Matrix{Float64}`: [ntrac+1, len] y locations of trajectories (x0 and derived ones).
+- `vx::Matrix{Float64}`: [ntrac, len] Derived x-velocity.
+- `vy::Matrix{Float64}`: [ntrac, len] Derived y-velocity.
+- `score::Matrix{Float64}`: [ntrac, len] Scores along the trajectory (max values, possibly at subgrid).
 - `zss::Array{Float64,4}`: [nsx, nsy, ntrac+1, len] (optional, if non-`nothing`)
     (Diagnosis output if wanted) The subimages along the track.
 - `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] (optional, if non-`nothing`)
@@ -875,13 +875,13 @@ Conduct tracking (core).
 - `out_score_ary::Bool`: Whether output score arrays.
 
 # Returns
-- `count::Array{Float64,2}`: (len: len) The number of successful tracking for each initial template.
-- `tid::Array{Float64,2}`: (len: (ntrac+1)*len) Time index of the trajectories (tid0 and subsequent ones).
-- `x::Array{Float64,2}`: (len: (ntrac+1)*len) x locations of the trajectories (x0 and derived ones).
-- `y::Array{Float64,2}`: (len: (ntrac+1)*len) y locations of trajectories (x0 and derived ones).
-- `vx::Array{Float64,2}`: (len: ntrac*len) Derived x-velocity.
-- `vy::Array{Float64,2}`: (len: ntrac*len) Derived y-velocity.
-- `score::Array{Float64,2}`: (len: ntrac*len)  Scores along the trajectory (max values, possibly at subgrid).
+- `count::Matrix{Float64}`: (len: len) The number of successful tracking for each initial template.
+- `tid::Matrix{Float64}`: (len: (ntrac+1)*len) Time index of the trajectories (tid0 and subsequent ones).
+- `x::Matrix{Float64}`: (len: (ntrac+1)*len) x locations of the trajectories (x0 and derived ones).
+- `y::Matrix{Float64}`: (len: (ntrac+1)*len) y locations of trajectories (x0 and derived ones).
+- `vx::Matrix{Float64}`: (len: ntrac*len) Derived x-velocity.
+- `vy::Matrix{Float64}`: (len: ntrac*len) Derived y-velocity.
+- `score::Matrix{Float64}`: (len: ntrac*len)  Scores along the trajectory (max values, possibly at subgrid).
 - `zss::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
 - `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
