@@ -387,23 +387,25 @@ function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     end
     
     isx = Int(sign(dx))
-    dx = abs(dx)
+    dx0 = Float32(abs(dx))
+    dx1 = Float32(1.0)-dx0
     isy = Int(sign(dy))
-    dy = abs(dy)
+    dy0 = Float32(abs(dy))
+    dy1 = Float32(1.0)-dy0
 
-    zsubg = zs * (1.0-dx) * (1.0-dy)
+    zsubg = zs * (dx1*dy1)
     if isx != 0
         stat, zsw1 = get_zsub_view(o, tid, xi+isx, yi)
         if stat
             return stat, nothing
         end
-        zsubg .+= zsw1 * (dx*(1.0-dy))
+        zsubg .+= zsw1 * (dx0*dy1)
         if isy != 0
             stat, zsw1 = get_zsub_view(o, tid, xi+isx, yi+isy)
             if stat
                 return stat, nothing
             end
-            zsubg .+= zsw1 * (dx*dy)
+            zsubg .+= zsw1 * (dx0*dy0)
         end
     end
     if isy != 0
@@ -411,7 +413,7 @@ function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
         if stat
             return stat, nothing
         end
-        zsubg .+= zsw1 * ((1.0-dx)*dy)
+        zsubg .+= zsw1 * (dx1*dy0)
     end
     return stat, zsubg
 end
@@ -621,7 +623,7 @@ function get_score_ncov(o::VTT, x, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
 end
 
 """Conduct template matching driver."""
-function get_score(o::VTT, zs0, tid, k0::Int, k1::Int, l0::Int, l1::Int)
+function get_score(o::VTT, zs0::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     if o.score_method == "xcor"
         stat, scr = get_score_xcor(o, zs0, tid, k0, k1, l0, l1)
     elseif o.score_method == "ncov"
@@ -732,7 +734,7 @@ Find the score peak and its location.
 - `lpi::Float64`: the peak location y.
 - `scrp::Float64`: the peak score.
 """
-function find_score_peak(o::VTT, scr, kw::Int, lw::Int)
+function find_score_peak(o::VTT, scr::Array{Float64,2}, kw::Int, lw::Int)
     # find the max and its index
     l_and_k = findlast(x->x==maximum(scr), scr)
     scrp = scr[l_and_k]
@@ -885,7 +887,6 @@ Conduct tracking (core).
 """
 function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_score_ary::Bool)
     len = length(tid0)
-    zmiss = o.zmiss
     fmiss = o.fmiss
     imiss = o.imiss
 
