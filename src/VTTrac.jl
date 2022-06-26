@@ -761,24 +761,24 @@ function find_score_peak(o::VTT, scr, kw::Int, lw::Int)
 end
 
 """
-    interp_2d(z, i, j)
+    interp_2ds(z, is, js)
 
 Interpolate 2d values by bilinear interpolation
 
 # Arguments
 - `z`: 2d array.
-- `i`: 1st index. It can be vector.
-- `j`: 2nd index. It can be vector.
+- `is`: 1st index. It can be vector.
+- `js`: 2nd index. It can be vector.
 
 # Returns
 - `z_interp`: Interpolated values.
 """
-function interp_2d(z, i, j)
+function interp_2d(z, is, js)
     ni, nj = size(z)
-    i0 = Int.(floor.(i))
-    j0 = Int.(floor.(j))
-    di0 = i - i0
-    dj0 = j - j0
+    i0 = Int.(floor.(is))
+    j0 = Int.(floor.(js))
+    di0 = is - i0
+    dj0 = js - j0
     di1 = 1 .- di0
     dj1 = 1 .- dj0
     i0j0 = CartesianIndex.(i0, j0)
@@ -786,6 +786,34 @@ function interp_2d(z, i, j)
     i0j1 = CartesianIndex.(i0, min.(j0.+1, nj))
     i1j1 = CartesianIndex.(min.(i0.+1, ni), min.(j0.+1, nj))
     z_interp = di1 .* dj1 .* z[i0j0] .+ di0 .* dj1 .* z[i1j0] .+ di1 .* dj0 .* z[i0j1] .+ di0 .* dj0 .* z[i1j1]
+    return z_interp
+end
+
+
+"""
+    interp_2d(z, i, j)
+
+Interpolate 2d values by bilinear interpolation
+
+# Arguments
+- `z`: 2d array.
+- `i`: 1st index.
+- `j`: 2nd index.
+
+# Returns
+- `z_interp`: Interpolated values.
+"""
+function interp_2d(z, i, j)
+    ni, nj = size(z)
+    i0 = Int(floor(i))
+    j0 = Int(floor(j))
+    i1 = min(i0+1, ni)
+    j1 = min(j0+1, nj)
+    di0 = i - i0
+    dj0 = j - j0
+    di1 = 1 - di0
+    dj1 = 1 - dj0
+    z_interp = @inbounds di1*dj1*z[i0,j0] + di0* dj1*z[i1,j0] + di1*dj0*z[i0,j1] + di0*dj0*z[i1,j1]
     return z_interp
 end
 
