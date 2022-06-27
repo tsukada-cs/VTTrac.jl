@@ -908,14 +908,14 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
 
     if out_subimage
         shape2 = [o.ntrac+1, o.nsy, o.nsx, len]
-        zss = zeros(shape2...)
+        zss = fill(o.zmiss, shape2...)
     else
         zss = nothing
     end
 
     if out_score_ary
         shape2 = [o.ntrac, 2o.iyhw+1, 2o.ixhw+1, len]
-        score_ary = zeros(shape2...)
+        score_ary = fill(fmiss, shape2...)
     else
         score_ary = nothing
     end
