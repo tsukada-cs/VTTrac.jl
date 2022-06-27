@@ -461,7 +461,7 @@ Check if there is data missing in the specified region at `tid`.
 - `stat::Bool`: `false` if there is no data missing, `true` if not.
 """
 function chk_zmiss_region(o::VTT, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
-    return o.zmiss in o.z[tid, l0:l1, k0:k1]
+    return o.zmiss in @view o.z[tid, l0:l1, k0:k1]
 end
 
 """
