@@ -338,28 +338,22 @@ Like `get_zsub`, but returns a view.
 * [`get_zsub`](@ref)
 """
 function get_zsub_view(o::VTT, tid::Int, xi::Int, yi::Int)
-    stat = false
     nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
     xi0, yi0 = xi - nsx2, yi - nsy2
     if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
-        stat = true # sub-image is not within the original image
-        return stat, nothing
+        return true, nothing # sub-image is not within the original image
     end
     zs = @inbounds @view o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
     if o.chk_zmiss
-        stat = o.zmiss in zs
-        if stat
-            return stat, nothing
+        if o.zmiss in zs
+            return true, nothing
         end
     end
-    return stat, zs
+    return false, zs
 end
 
 """round to Int like C/C++"""
 function roundInt(x::Real)
-    if typeof(x) === Integer
-        return x
-    end
     return round(Int, x, RoundNearestTiesAway)
 end
 
@@ -949,8 +943,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
         
-            xcur = x[j,m] # x current
-            ycur = y[j,m] # y current
+            xcur = @inbounds x[j,m] # x current
+            ycur = @inbounds y[j,m] # y current
 
             # record initial data
             tidf = tid0[m] + (j-1)*itstep  # index of the tracking start time
@@ -1061,8 +1055,8 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             vx[j,m] = vxw
             vy[j,m] = vyw
             if out_subimage && j == o.ntrac # last sub image
-                xcur = x[j+1,m]
-                ycur = y[j+1,m]
+                xcur = @inbounds x[j+1,m]
+                ycur = @inbounds y[j+1,m]
                 stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
                 zss[j+1,:,:,m] = zs0
             end
