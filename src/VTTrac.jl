@@ -12,6 +12,7 @@ mutable struct VTT
     ny::Int # image size y
     nt::Int # time length
     z::Array{Float32,3}
+    mask::Array{Bool,3}
     t::Vector{Float64}
     dtmean::Float64
     zmiss::Float32
@@ -20,6 +21,7 @@ mutable struct VTT
 
     # tracking parameters
     chk_zmiss::Bool # if true, check missing values in `z` (image)
+    chk_mask::Bool # if true, check mask in `mask` (mask of image)
     nsx::Int # sub-image size x
     nsy::Int # sub-image size y
     vxhw::Float64  # velocities corresponding to `ixhw` through `dtmean`
@@ -50,10 +52,11 @@ mutable struct VTT
     - `z::Array{Float32,3}`: Array of image-like data (in dimensions [time, y, x]). `z[i]` contains `i`-th image data.
     - `t::Vector{Float64}`: Times at which the images are for.
     - `zmiss::Union{Real, Nothing}=nothing`: Missing value used in `z`.
+    - `mask::Union{Array{Bool,3}, Nothing}=nothing`: Mask to ignore when calculate score (true positions are ignored).
     - `fmiss::Real=-999.0`: Missing value to be set for Real.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
+    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, mask::Union{Array{Bool,3}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
@@ -63,6 +66,7 @@ mutable struct VTT
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
         o.dtmean = (t[end]-t[begin])/(o.nt-1)
+
         if isnothing(zmiss)
             o.chk_zmiss = false
             o.zmiss = Float32(0.0)
@@ -72,6 +76,15 @@ mutable struct VTT
         end
         o.fmiss = fmiss
         o.imiss = imiss
+
+        if isnothing(mask) || !any(mask)
+            o.chk_mask = false
+        else
+            size(mask) != size(z) && throw(ArgumentError("`size(mask)` must be `(size(z)`"))
+            o.chk_mask = true
+            o.mask = mask
+        end
+
         o.setuped = false
         return o
     end
