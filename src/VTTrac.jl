@@ -38,7 +38,9 @@ mutable struct VTT
     score_method::String
     score_th0::AbstractFloat
     score_th1::AbstractFloat
+    chk_peak_inside::Bool
     peak_inside_th::Float32 #threshold for the peak-inside screening(unused if<0)
+    chk_min_contrast::Bool
     min_contrast::Float32 # minimum contrast in the template (unused if=<0)
     use_init_temp::Bool # if true, always use initial template submimages
     setuped::Bool
@@ -291,8 +293,20 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
     o.score_method = score_method
     o.score_th0 = score_th0
     o.score_th1 = score_th1
+    if peak_inside_th > 0.0
+        o.chk_peak_inside = true
+    else
+        o.chk_peak_inside = false
+    end
     o.peak_inside_th = Float32(peak_inside_th)
+
+    if min_contrast > 0.0
+        o.chk_min_contrast = true
+    else
+        o.chk_min_contrast = false
+    end
     o.min_contrast = Float32(min_contrast)
+
     o.vxch = vxch # unused if < 0
     o.vych = vych # unused if < 0
     o.use_init_temp = use_init_temp
@@ -439,12 +453,6 @@ If `o.peak_inside_th` < 0, no checking is conducted.
 - `stat::Bool`: `false` if passed the check, `true` if not.
 """
 function chk_zsub_peak_inside(o::VTT, zs::AbstractMatrix{Float32})
-    stat = true
-    if o.peak_inside_th < 0
-        stat = false # do not check --> no problem
-        return stat
-    end
-
     # find max and min along sides
     side_max = maximum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
     side_min = minimum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
@@ -454,9 +462,9 @@ function chk_zsub_peak_inside(o::VTT, zs::AbstractMatrix{Float32})
     inner_min = minimum([zs[begin+1,begin+1:end-1]; zs[end-1,begin+1:end-1]; zs[begin+2:end-2,begin+1]; zs[begin+2:end-2,end-1]])
 
     if (inner_max > side_max + o.peak_inside_th*(inner_max-inner_min) || inner_min < side_min - o.peak_inside_th*(inner_max-inner_min))
-        stat = false # OK, because the max or min is inside and the difference from the max or min on the sides is not too tiny
+        return false # OK, because the max or min is inside and the difference from the max or min on the sides is not too tiny
     end
-    return stat
+    return true
 end
 
 """
@@ -977,7 +985,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
 
-            if o.min_contrast > 0.0
+            if o.chk_min_contrast
                 if maximum(zs0) - minimum(zs0) < o.min_contrast
                     status[m] = 3
                     # @info "(m=$m) Stop tracking at checkpoint 3 (during `min_contrast` check)"
@@ -985,7 +993,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 end
             end
 
-            if o.peak_inside_th > 0.0
+            if o.chk_peak_inside
                 stat = chk_zsub_peak_inside(o, zs0)
                 if stat
                     status[m] = 4
