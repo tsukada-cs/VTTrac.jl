@@ -842,18 +842,25 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
         return get_score_ncov(o, x, tid, k0, k1, l0, l1)
     end
 
+    allnan = true
     for l = 0:nl-1
         for k = 0:nk-1
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
-            visible_and_visible = visible .|| visible_at_kl
+            visible_and_visible = visible .* visible_at_kl
             if !any(visible_and_visible)
                 continue
             end
             x_valid = x[visible_and_visible]
             scr[l+1,k+1] = cov(x_valid, sub_at_kl[visible_and_visible], corrected=false)/std(x_valid, corrected=false)
+            allnan = false
         end
     end
+
+    if allnan
+        return true, nothing
+    end
+
     return stat, scr
 end
 
