@@ -44,6 +44,7 @@ mutable struct VTT
     min_contrast::Float32 # minimum contrast in the template (unused if=<0)
     use_init_temp::Bool # if true, always use initial template submimages
     setuped::Bool
+    min_visible::Int # minimum number of visible values to calculate score when `chk_mask` is true.
 
     """
         VTT(z[, t, visible, zmiss, fmiss, imiss])
@@ -95,7 +96,7 @@ end
 """
     setup(o, nsx, nsy, vxhw, vyhw, [ixhw, iyhw, subgrid, subgrid_gaus,
         itstep, ntrac, score_method, score_th0, score_th1, vxch, vych,
-        peak_inside, peak_inside_th, min_contrast, use_init_temp])
+        peak_inside, peak_inside_th, min_contrast, use_init_temp, min_visible])
 
 Setup for tracking.
 
@@ -124,13 +125,14 @@ Setup for tracking.
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
 - `min_contrast::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
     it has a difference in max and min greater than its value.
+- `min_visible::Int=1`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
 function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing,
             ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, subgrid::Bool=true,
             subgrid_gaus::Bool=false, itstep::Int=1, ntrac::Int=2, score_method::String="xcor",
             score_th0::AbstractFloat=0.8, score_th1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
             vych::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
-            min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false)
+            min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_visible::Int=1)
     o.nsx = nsx
     o.nsy = nsy
     if vxhw !== nothing
@@ -157,7 +159,7 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
     min_contrast = Float32(min_contrast)
     
     set_basic!(o, nsx, nsy, itstep, ntrac)
-    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp)
+    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp, min_visible)
     o.setuped = true
 end
 
@@ -286,8 +288,9 @@ Sets optional tracking parameters.
     if the result of the second tracking is rejected, the first one is also rejected, since there is 
     no consecutive consistent result in this case.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
+- `min_visible::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool, min_visible::Int)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
@@ -310,6 +313,7 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
     o.vxch = vxch # unused if < 0
     o.vych = vych # unused if < 0
     o.use_init_temp = use_init_temp
+    o.min_visible = min_visible
 end
 
 """To check whether a time index is valid. Returns `false` if valid, `true` if not."""
@@ -796,7 +800,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if !any(visible_and_visible)
+            if !any(visible_and_visible) || sum(visible_and_visible) < o.min_visible
                 continue
             end
             scr[l+1,k+1] = cor(x[visible_and_visible], sub_at_kl[visible_and_visible])
@@ -848,7 +852,7 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if !any(visible_and_visible)
+            if !any(visible_and_visible) || sum(visible_and_visible) < o.min_visible
                 continue
             end
             x_valid = x[visible_and_visible]
@@ -1221,6 +1225,9 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             if j == 1 || !o.use_init_temp 
                 if o.chk_mask
                     stat, zs0, visible = get_zsub_visible_subgrid(o, tidf, xcur, ycur)
+                    if !stat
+                        stat = sum(visible) < o.min_visible
+                    end
                 else
                     stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
                 end

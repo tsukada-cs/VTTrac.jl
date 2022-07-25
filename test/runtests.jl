@@ -167,10 +167,16 @@ using Statistics
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test vtt.visible == .!mask # Check to see if the view is being written.
         
+        vtt.min_visible = vtt.ixhw * vtt.iyhw
+        count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test any(ismissing.(score_ary))
+        vtt.min_visible = 1
+
         mask = z .>= 1.1 * minimum(z) # almost masked
         vtt.visible = .!(mask)
         vtt.chk_mask = true
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test any(ismissing.(score_ary))
+
     end
 end
