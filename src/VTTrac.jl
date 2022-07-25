@@ -790,6 +790,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
         return get_score_xcor(o, x, tid, k0, k1, l0, l1)
     end
 
+    allnan = true
     for l = 0:nl-1
         for k = 0:nk-1
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
@@ -799,8 +800,14 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
                 continue
             end
             scr[l+1,k+1] = cor(x[visible_and_visible], sub_at_kl[visible_and_visible])
+            allnan = false
         end
     end
+
+    if allnan
+        return true, nothing
+    end
+    
     return stat, scr
 end
 
@@ -1273,6 +1280,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 # @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
                 continue
             end
+
             if out_score_ary
                 score_ary[j,:,:,m] .= scr
             end
