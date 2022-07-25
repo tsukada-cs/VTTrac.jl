@@ -313,7 +313,7 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
     o.vxch = vxch # unused if < 0
     o.vych = vych # unused if < 0
     o.use_init_temp = use_init_temp
-    o.min_visible = min_visible
+    o.min_visible = max(min_visible, 1)
 end
 
 """To check whether a time index is valid. Returns `false` if valid, `true` if not."""
@@ -791,7 +791,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     end
 
     if all(@inbounds @view o.visible[tid, l0:l1+nsy2, k0:k1+nsx2])
-        return get_score_xcor(o, x, tid, k0+nsx2, k1, l0+nsx2, l1)
+        return get_score_xcor(o, x, tid, k0+nsx2, k1, l0+nsy2, l1)
     end
 
     allnan = true
@@ -800,7 +800,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if !any(visible_and_visible) || sum(visible_and_visible) < o.min_visible
+            if sum(visible_and_visible) < o.min_visible
                 continue
             end
             scr[l+1,k+1] = cor(x[visible_and_visible], sub_at_kl[visible_and_visible])
@@ -843,7 +843,7 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     end
 
     if all(@inbounds @view o.visible[tid, l0:l1+nsy2, k0:k1+nsx2])
-        return get_score_ncov(o, x, tid, k0, k1, l0, l1)
+        return get_score_ncov(o, x, tid, k0+nsx2, k1, l0+nsy2, l1)
     end
 
     allnan = true
@@ -852,7 +852,7 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if !any(visible_and_visible) || sum(visible_and_visible) < o.min_visible
+            if sum(visible_and_visible) < o.min_visible
                 continue
             end
             x_valid = x[visible_and_visible]
