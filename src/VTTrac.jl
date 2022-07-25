@@ -617,7 +617,6 @@ Sliding cross-correlation between the sugimage and image at `tid`.
 - `scr::Matrix{Float64}`: Score array.
 """
 function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
-    nx, ny = o.nx, o.ny
     nsx, nsy = o.nsx, o.nsy
     nsx2, nsy2 = div(nsx,2), div(nsy,2)
     nk = k1 - k0 + 1
@@ -626,12 +625,12 @@ function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int
     k0 = k0 - nsx2
     l0 = l0 - nsy2
     scr = zeros(nl,nk)
-    stat = ( k0 < 1 || k1+nsx-1 > nx || l0 < 1 || l1+nsy-1 > ny )
+    stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
     end
     if o.chk_zmiss
-        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx2, l0, l1+nsy2)
         if stat
             return stat, nothing
         end
@@ -683,7 +682,6 @@ Normalization is done by the sigma of the fist image : cov(x',y')/sigx^2
 - `scr::Matrix{Float64}`: Score array.
 """
 function sliding_ncov(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
-    nx, ny = o.nx, o.ny
     nsx, nsy = o.nsx, o.nsy
     nsx2, nsy2 = div(nsx,2), div(nsy,2)
     nk = k1 - k0 + 1
@@ -693,12 +691,12 @@ function sliding_ncov(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int
     k0 = k0 - nsx2
     l0 = l0 - nsy2
     scr = zeros(nl,nk)
-    stat = ( k0 < 1 || k1+nsx-1 > nx || l0 < 1 || l1+nsy-1 > ny )
+    stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
     end
     if o.chk_zmiss
-        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx2, l0, l1+nsy2)
         if stat
             return stat, nothing
         end
@@ -777,16 +775,21 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     k0 = k0 - nsx2
     l0 = l0 - nsy2
     scr = fill(o.fmiss, (nl,nk))
-    stat = ( k0 < 1 || k1+nsx-1 > o.nx || l0 < 1 || l1+nsy-1 > o.ny )
+    stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
     end
     if o.chk_zmiss
-        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx2, l0, l1+nsy2)
         if stat
             return stat, nothing
         end
     end
+
+    if all(@inbounds @view o.visible[tid, l0:l1+nsy2, k0:k1+nsx2])
+        return get_score_xcor(o, x, tid, k0, k1, l0, l1)
+    end
+
     for l = 0:nl-1
         for k = 0:nk-1
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
@@ -817,16 +820,21 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     k0 = k0 - nsx2
     l0 = l0 - nsy2
     scr = fill(o.fmiss, (nl,nk))
-    stat = ( k0 < 1 || k1+nsx-1 > o.nx || l0 < 1 || l1+nsy-1 > o.ny )
+    stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
     end
     if o.chk_zmiss
-        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx2, l0, l1+nsy2)
         if stat
             return stat, nothing
         end
     end
+
+    if all(@inbounds @view o.visible[tid, l0:l1+nsy2, k0:k1+nsx2])
+        return get_score_ncov(o, x, tid, k0, k1, l0, l1)
+    end
+
     for l = 0:nl-1
         for k = 0:nk-1
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
