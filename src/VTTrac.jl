@@ -562,7 +562,7 @@ function get_zsub_visible_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     end
 
     vissubg = Bool.(round.(Int8, vissubg))
-    if all(vissubg)
+    if !any(vissubg)
         return true, nothing, nothing
     end
 
