@@ -404,12 +404,12 @@ function get_zsub_visible(o::VTT, tid::Int, xi::Int, yi::Int)
     nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
     xi0, yi0 = xi - nsx2, yi - nsy2
     if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
-        return true, nothing # sub-image is not within the original image
+        return true, nothing, nothing # sub-image is not within the original image
     end
     zs = @inbounds o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
     if o.chk_zmiss
         if o.zmiss in zs
-            return true, nothing
+            return true, nothing, nothing
         end
     end
 
@@ -432,13 +432,13 @@ function get_zsub_visible_view(o::VTT, tid::Int, xi::Int, yi::Int)
     nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
     xi0, yi0 = xi - nsx2, yi - nsy2
     if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
-        return true, nothing # sub-image is not within the original image
+        return true, nothing, nothing # sub-image is not within the original image
     end
 
     zs = @inbounds @view o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
     if o.chk_zmiss
         if o.zmiss in zs
-            return true, nothing
+            return true, nothing, nothing
         end
     end
 
