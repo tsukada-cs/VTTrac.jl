@@ -518,9 +518,9 @@ function get_zsub_visible_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     xi, yi = roundInt(x), roundInt(y)
     dx, dy = x - xi, y - yi
 
-    stat, zs, visibles = get_zsub_visible_view(o, tid, xi, yi)
+    stat, zs, vissub = get_zsub_visible_view(o, tid, xi, yi)
     if stat || (dx == 0.0 && dy == 0.0) # just on the grid
-        return stat, zs, visibles
+        return stat, zs, vissub
     end
 
     isx = Int(sign(dx))
@@ -531,38 +531,38 @@ function get_zsub_visible_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     dy1 = Float32(1.0)-dy0
 
     zsubg = zs * (dx1*dy1)
-    visiblesubg = visibles * (dx1*dy1)
+    vissubg = vissub * (dx1*dy1)
     if isx != 0
-        stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi+isx, yi)
+        stat, zsw1, vissubw1 = get_zsub_visible_view(o, tid, xi+isx, yi)
         if stat
             return stat, nothing, nothing
         end
         zsubg .+= zsw1 * (dx0*dy1)
-        visiblesubg .+= visiblesubw1 * (dx0*dy1)
+        vissubg .+= vissubw1 * (dx0*dy1)
         if isy != 0
-            stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi+isx, yi+isy)
+            stat, zsw1, vissubw1 = get_zsub_visible_view(o, tid, xi+isx, yi+isy)
             if stat
                 return stat, nothing, nothing
             end
             zsubg .+= zsw1 * (dx0*dy0)
-            visiblesubg .+= visiblesubw1 * (dx0*dy0)
+            vissubg .+= vissubw1 * (dx0*dy0)
         end
     end
     if isy != 0
-        stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi, yi+isy)
+        stat, zsw1, vissubw1 = get_zsub_visible_view(o, tid, xi, yi+isy)
         if stat
             return stat, nothing, nothing
         end
         zsubg .+= zsw1 * (dx1*dy0)
-        visiblesubg .+= visiblesubw1 * (dx1*dy0)
+        vissubg .+= vissubw1 * (dx1*dy0)
     end
 
-    visiblesubg = Bool.(round.(Int8, visiblesubg))
-    if all(visiblesubg)
+    vissubg = Bool.(round.(Int8, vissubg))
+    if all(vissubg)
         return true, nothing, nothing
     end
 
-    return stat, zsubg, visiblesubg
+    return stat, zsubg, vissubg
 end
 
 """
