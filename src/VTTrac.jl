@@ -12,7 +12,7 @@ mutable struct VTT
     ny::Int # image size y
     nt::Int # time length
     z::Array{Float32,3}
-    mask::Array{Bool,3}
+    visible::Union{BitArray{3}, Array{Bool,3}}
     t::Vector{Float64}
     dtmean::Float64
     zmiss::Float32
@@ -46,7 +46,7 @@ mutable struct VTT
     setuped::Bool
 
     """
-        VTT(z[, t, zmiss, fmiss, imiss])
+        VTT(z[, t, visible, zmiss, fmiss, imiss])
     
     Sets data for tracking (you need to set parameters separately).
     
@@ -58,7 +58,7 @@ mutable struct VTT
     - `fmiss::Real=-999.0`: Missing value to be set for Real.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, mask::Union{Array{Bool,3}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
+    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, mask::Union{BitArray{3}, Array{Bool,3}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
@@ -84,7 +84,7 @@ mutable struct VTT
         else
             size(mask) != size(z) && throw(ArgumentError("`size(mask)` must be `(size(z)`"))
             o.chk_mask = true
-            o.mask = mask
+            o.visible = .!mask
         end
 
         o.setuped = false
@@ -379,6 +379,70 @@ function get_zsub_view(o::VTT, tid::Int, xi::Int, yi::Int)
     return false, zs
 end
 
+"""
+    get_zsub_visible(o, tid, xi, yi)
+
+Read out a template subimage and subvisible from the image and visible at `tid`.
+
+The sub-image positons are specified at its center. (If the sub-image
+size is even, with one more pix on the "left" / "bottom", by starting
+from the index `xi-nsx/2`, `yi-nsy/2`).
+
+# Returns
+- `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
+no data missing), `true` if not.
+- `zsub::Matrix{Float32}`: Subimage at (x,y) = (xi, yi). 
+
+# See Also
+* [`get_zsub_visible_view`](@ref)
+"""
+function get_zsub_visible(o::VTT, tid::Int, xi::Int, yi::Int)
+    nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
+    xi0, yi0 = xi - nsx2, yi - nsy2
+    if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
+        return true, nothing # sub-image is not within the original image
+    end
+    zs = @inbounds o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+    if o.chk_zmiss
+        if o.zmiss in zs
+            return true, nothing
+        end
+    end
+
+    visible = @inbounds o.visible[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+    return false, zs, visible
+end
+
+"""
+    get_zsub_visible_view(o, tid, xi, yi)
+
+Like `get_zsub_visible`, but returns a view.
+
+# Notes
+* This function returns a view of zsub and visible. `get_zsub_visible` returns a copy of zsub and visible.
+
+# See Also
+* [`get_zsub_visible`](@ref)
+"""
+function get_zsub_visible_view(o::VTT, tid::Int, xi::Int, yi::Int)
+    nsx2, nsy2 = div(o.nsx,2), div(o.nsy,2)
+    xi0, yi0 = xi - nsx2, yi - nsy2
+    if xi0 < 1 || xi0 + o.nsx-1 > o.nx || yi0 < 1 || yi0 + o.nsy-1 > o.ny
+        return true, nothing # sub-image is not within the original image
+    end
+
+    zs = @inbounds @view o.z[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+    if o.chk_zmiss
+        if o.zmiss in zs
+            return true, nothing
+        end
+    end
+
+    visible = @inbounds @view o.visible[tid, yi0:yi0+o.nsy-1, xi0:xi0+o.nsx-1]
+
+    return false, zs, visible
+end
+
 """round to Int like C/C++"""
 function roundInt(x::Real)
     return round(Int, x, RoundNearestTiesAway)
@@ -402,7 +466,6 @@ function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
     dx, dy = x - xi, y - yi
 
     stat, zs = get_zsub_view(o, tid, xi, yi)
-
     if stat || (dx == 0.0 && dy == 0.0) # just on the grid
         return stat, zs
     end
@@ -437,6 +500,69 @@ function get_zsub_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
         zsubg .+= zsw1 * (dx1*dy0)
     end
     return stat, zsubg
+end
+"""
+    get_zsub_visible_subgrid(o, tid, x, y)
+
+Read out a template submimage from the image at `tid`.
+Possibly at subgrid: Linearly interpolated, if
+x or y has deviation from integer (bilinear if x and y).
+Efficient: no unnecessary read-out is made.
+
+# Returns
+- `stats::Bool`: `false` if successful (specified region is valid and, if `chk_zmiss`, 
+no data missing), `true` if not.
+- `zsubg::Matrix{Float32}`: Subimage.
+"""
+function get_zsub_visible_subgrid(o::VTT, tid::Int, x::Float64, y::Float64)
+    xi, yi = roundInt(x), roundInt(y)
+    dx, dy = x - xi, y - yi
+
+    stat, zs, visibles = get_zsub_visible_view(o, tid, xi, yi)
+    if stat || (dx == 0.0 && dy == 0.0) # just on the grid
+        return stat, zs, visibles
+    end
+
+    isx = Int(sign(dx))
+    dx0 = Float32(abs(dx))
+    dx1 = Float32(1.0)-dx0
+    isy = Int(sign(dy))
+    dy0 = Float32(abs(dy))
+    dy1 = Float32(1.0)-dy0
+
+    zsubg = zs * (dx1*dy1)
+    visiblesubg = visibles * (dx1*dy1)
+    if isx != 0
+        stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi+isx, yi)
+        if stat
+            return stat, nothing, nothing
+        end
+        zsubg .+= zsw1 * (dx0*dy1)
+        visiblesubg .+= visiblesubw1 * (dx0*dy1)
+        if isy != 0
+            stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi+isx, yi+isy)
+            if stat
+                return stat, nothing, nothing
+            end
+            zsubg .+= zsw1 * (dx0*dy0)
+            visiblesubg .+= visiblesubw1 * (dx0*dy0)
+        end
+    end
+    if isy != 0
+        stat, zsw1, visiblesubw1 = get_zsub_visible_view(o, tid, xi, yi+isy)
+        if stat
+            return stat, nothing, nothing
+        end
+        zsubg .+= zsw1 * (dx1*dy0)
+        visiblesubg .+= visiblesubw1 * (dx1*dy0)
+    end
+
+    visiblesubg = Bool.(round.(Int8, visiblesubg))
+    if all(visiblesubg)
+        return true, nothing, nothing
+    end
+
+    return stat, zsubg, visiblesubg
 end
 
 """
@@ -614,8 +740,7 @@ Conduct template matching, scoring by cross-correlation.
 function get_score_xcor(o::VTT, x::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
-    sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
-    # sigx = stdm(x, xm) # if use stdm, std is computed as sqrt(sum(xd.^2)/(n-1))
+    sigx = stdm(x, xm, corrected=false)
     stat, scr = sliding_xcor(o, sigx, xd, tid, k0, k1, l0, l1)    
     return stat, scr
 end
@@ -631,21 +756,112 @@ Conduct template matching, scoring by normalized covariance.
 function get_score_ncov(o::VTT, x::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     xm = mean(x)
     xd = x .- xm
-    sigx = sqrt(mean(xd.^2)) # std is computed as sqrt(sum(xd.^2)/n)
-    # sigx = stdm(x, xm) # if use stdm, std is computed as sqrt(sum(xd.^2)/(n-1))
+    sigx = stdm(x, xm, corrected=false)
     stat, scr = sliding_ncov(o, sigx, xd, tid, k0, k1, l0, l1)
     return stat, scr
 end
 
-"""Conduct template matching driver."""
+"""
+    get_score_xcor_with_visible(o, x, tid, k0, k1, l0, l1)
+
+Conduct template matching, scoring by cross-correlation.
+
+# Returns
+- `stat::Bool`: `false` if passed the check, `true` if not.
+"""
+function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible::Union{BitMatrix, AbstractMatrix{Bool}}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+    nsx, nsy = o.nsx, o.nsy
+    nsx2, nsy2 = div(nsx,2), div(nsy,2)
+    nk = k1 - k0 + 1
+    nl = l1 - l0 + 1
+    k0 = k0 - nsx2
+    l0 = l0 - nsy2
+    scr = fill(o.fmiss, (nl,nk))
+    stat = ( k0 < 1 || k1+nsx-1 > o.nx || l0 < 1 || l1+nsy-1 > o.ny )
+    if stat
+        return stat, nothing
+    end
+    if o.chk_zmiss
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        if stat
+            return stat, nothing
+        end
+    end
+    for l = 0:nl-1
+        for k = 0:nk-1
+            sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+            visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+            visible_and_visible = visible .* visible_at_kl
+            if !any(visible_and_visible)
+                continue
+            end
+            scr[l+1,k+1] = cor(x[visible_and_visible], sub_at_kl[visible_and_visible])
+        end
+    end
+    return stat, scr
+end
+
+"""
+    get_score_ncov_with_visible(o, x, tid, k0, k1, l0, l1)
+
+Conduct template matching, scoring by normalized covariance.
+
+# Returns
+- `stat::Bool`: `false` if passed the check, `true` if not.
+"""
+function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible::Union{BitMatrix, AbstractMatrix{Bool}}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+    nsx, nsy = o.nsx, o.nsy
+    nsx2, nsy2 = div(nsx,2), div(nsy,2)
+    nk = k1 - k0 + 1
+    nl = l1 - l0 + 1
+    k0 = k0 - nsx2
+    l0 = l0 - nsy2
+    scr = fill(o.fmiss, (nl,nk))
+    stat = ( k0 < 1 || k1+nsx-1 > o.nx || l0 < 1 || l1+nsy-1 > o.ny )
+    if stat
+        return stat, nothing
+    end
+    if o.chk_zmiss
+        stat = chk_zmiss_region(o, tid, k0, k1+nsx-1, l0, l1+nsy-1)
+        if stat
+            return stat, nothing
+        end
+    end
+    for l = 0:nl-1
+        for k = 0:nk-1
+            sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+            visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
+            visible_and_visible = visible .|| visible_at_kl
+            if !any(visible_and_visible)
+                continue
+            end
+            x_valid = x[visible_and_visible]
+            scr[l+1,k+1] = cov(x_valid, sub_at_kl[visible_and_visible], corrected=false)/std(x_valid, corrected=false)
+        end
+    end
+    return stat, scr
+end
+
+"""Conduct template matching driver"""
 function get_score(o::VTT, zs0::AbstractMatrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     if o.score_method == "xcor"
         stat, scr = get_score_xcor(o, zs0, tid, k0, k1, l0, l1)
     elseif o.score_method == "ncov"
         stat, scr = get_score_ncov(o, zs0, tid, k0, k1, l0, l1)
     else
-        stat = true
-        return stat, nothing
+        return true, nothing
+    end
+   return stat, scr
+end
+
+"""Conduct template matching driver with visible"""
+function get_score_with_visible(o::VTT, zs0::AbstractMatrix{Float32}, visible::Union{BitMatrix, AbstractMatrix{Bool}}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
+    if o.score_method == "xcor"
+        stat, scr = get_score_xcor_with_visible(o, zs0, visible, tid, k0, k1, l0, l1)
+    elseif o.score_method == "ncov"
+        stat, scr = get_score_ncov_with_visible(o, zs0, visible, tid, k0, k1, l0, l1)
+    else
+        return true, nothing
     end
    return stat, scr
 end
@@ -751,7 +967,11 @@ Find the score peak and its location.
 """
 function find_score_peak(o::VTT, scr::Matrix{Float64}, kw::Int, lw::Int)
     # find the max and its index
-    l_and_k = findlast(x->x==maximum(scr), scr)
+    if o.chk_mask
+        l_and_k = findlast(x->x==maximum(filter(!isnan,scr)), scr)
+    else
+        l_and_k = findlast(x->x==maximum(scr), scr)
+    end
     scrp = scr[l_and_k]
     lpi, kpi = l_and_k[1], l_and_k[2]
 
@@ -977,8 +1197,13 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
             if j == 1 || !o.use_init_temp 
-                stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
+                if o.chk_mask
+                    stat, zs0, visible = get_zsub_visible_subgrid(o, tidf, xcur, ycur)
+                else
+                    stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
+                end
             end
+
             if stat
                 status[m] = 2
                 # @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
@@ -1028,8 +1253,13 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
             end
             kc = roundInt(xcur + vxg*dt)
             lc = roundInt(ycur + vyg*dt)
+            
+            if o.chk_mask
+                stat, scr = get_score_with_visible(o, zs0, visible, tidl, kc-ixhw, kc+ixhw, lc-iyhw, lc+iyhw)
+            else
+                stat, scr = get_score(o, zs0, tidl, kc-ixhw, kc+ixhw, lc-iyhw, lc+iyhw)
+            end
 
-            stat, scr = get_score(o, zs0, tidl, kc-ixhw, kc+ixhw, lc-iyhw, lc+iyhw)
             if stat
                 status[m] = 6
                 # @info "(m=$m) Stop tracking at checkpoint 6 (during `get_score`)"
