@@ -787,7 +787,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     end
 
     if all(@inbounds @view o.visible[tid, l0:l1+nsy2, k0:k1+nsx2])
-        return get_score_xcor(o, x, tid, k0, k1, l0, l1)
+        return get_score_xcor(o, x, tid, k0+nsx2, k1, l0+nsx2, l1)
     end
 
     allnan = true
