@@ -1091,7 +1091,7 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
         vx[vx.==fmiss] .= missing
         vy = Array{Union{Missing, Float64},2}(vy)
         vy[vy.==fmiss] .= missing
-        score = Array{Union{Missing, Float64},2}(score)
+        score = Array{Union{Missing, Float32},2}(score)
         score[score.==fmiss] .= missing
         zss = Array{Union{Missing, Float32},4}(zss)
         zss[zss.==o.zmiss] .= missing
@@ -1164,7 +1164,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
     y = fill(fmiss, shape1...)
     vx = fill(fmiss, shape0...)
     vy = fill(fmiss, shape0...)
-    score = fill(fmiss, shape0...)
+    score = fill(Float32(fmiss), shape0...)
     zs0 = fill(o.zmiss, o.nsy, o.nsx)
 
     if out_subimage
@@ -1308,7 +1308,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 # @info "(m=$m) Stop tracking at checkpoint 8 (during `score_th0` or `score_th1` check)"
                 continue
             end
-            score[j,m] = sp
+            score[j,m] = Float32(sp)
             xw = xp + kc - 1 - ixhw # next position (x-axis)
             yw = yp + lc - 1 - iyhw # next position (y-axis)
             vxw = (xw - x[j,m])/dt # velocity (x-axis)
