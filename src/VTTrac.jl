@@ -618,7 +618,7 @@ Sliding cross-correlation between the sugimage and image at `tid`.
 # Returns
 - `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
     (xcor) are defined at all tested center locations; `true` if not.
-- `scr::Matrix{Float64}`: Score array.
+- `scr::Matrix{Float32}`: Score array.
 """
 function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     nsx, nsy = o.nsx, o.nsy
@@ -628,7 +628,7 @@ function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int
     nsxy = nsx * nsy
     k0 = k0 - nsx2
     l0 = l0 - nsy2
-    scr = zeros(nl,nk)
+    scr = zeros(Float32, nl, nk)
     stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
@@ -683,7 +683,7 @@ Normalization is done by the sigma of the fist image : cov(x',y')/sigx^2
 # Returns
 - `stat::Bool`: `false` if all the relevant data and regions are valid, so all the scores
     (ncov) are defined at all tested center locations; `true` if not.
-- `scr::Matrix{Float64}`: Score array.
+- `scr::Matrix{Float32}`: Score array.
 """
 function sliding_ncov(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int, k1::Int, l0::Int, l1::Int)
     nsx, nsy = o.nsx, o.nsy
@@ -694,7 +694,7 @@ function sliding_ncov(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int
     sigx2 = sigx^2
     k0 = k0 - nsx2
     l0 = l0 - nsy2
-    scr = zeros(nl,nk)
+    scr = zeros(Float32, nl, nk)
     stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
@@ -778,7 +778,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     nl = l1 - l0 + 1
     k0 = k0 - nsx2
     l0 = l0 - nsy2
-    scr = fill(o.fmiss, (nl,nk))
+    scr = fill(Float32(o.fmiss), nl, nk)
     stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
@@ -830,7 +830,7 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
     nl = l1 - l0 + 1
     k0 = k0 - nsx2
     l0 = l0 - nsy2
-    scr = fill(o.fmiss, (nl,nk))
+    scr = fill(Float32(o.fmiss), nl, nk)
     stat = ( k0 < 1 || k1+nsx2 > o.nx || l0 < 1 || l1+nsy2 > o.ny )
     if stat
         return stat, nothing
@@ -991,7 +991,7 @@ Find the score peak and its location.
 - `lpi::Float64`: the peak location y.
 - `scrp::Float64`: the peak score.
 """
-function find_score_peak(o::VTT, scr::Matrix{Float64}, kw::Int, lw::Int)
+function find_score_peak(o::VTT, scr::Matrix{Float32}, kw::Int, lw::Int)
     # find the max and its index
     if o.chk_mask
         l_and_k = findlast(x->x==maximum(filter(!isnan,scr)), scr)
@@ -1048,7 +1048,7 @@ Conduct tracking.
 - `vx::Matrix{Float64}`: [ntrac, len] Derived x-velocity.
 - `vy::Matrix{Float64}`: [ntrac, len] Derived y-velocity.
 - `score::Matrix{Float64}`: [ntrac, len] Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: [nsx, nsy, ntrac+1, len] (optional, if non-`nothing`)
+- `zss::Array{Float32,4}`: [nsx, nsy, ntrac+1, len] (optional, if non-`nothing`)
     (Diagnosis output if wanted) The subimages along the track.
 - `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] (optional, if non-`nothing`)
     (Diagnosis output if wanted) The entire scores.
@@ -1093,10 +1093,10 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
         vy[vy.==fmiss] .= missing
         score = Array{Union{Missing, Float64},2}(score)
         score[score.==fmiss] .= missing
-        zss = Array{Union{Missing, Float64},4}(zss)
+        zss = Array{Union{Missing, Float32},4}(zss)
         zss[zss.==o.zmiss] .= missing
-        score_ary = Array{Union{Missing, Float64},4}(score_ary)
-        score_ary[score_ary.==fmiss] .= missing
+        score_ary = Array{Union{Missing, Float32},4}(score_ary)
+        score_ary[score_ary.==Float32(fmiss)] .= missing
     end
 
     if length(sh) >= 2
@@ -1143,8 +1143,8 @@ Conduct tracking (core).
 - `vx::Matrix{Float64}`: (len: ntrac*len) Derived x-velocity.
 - `vy::Matrix{Float64}`: (len: ntrac*len) Derived y-velocity.
 - `score::Matrix{Float64}`: (len: ntrac*len)  Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
-- `score_arry::Array{Float64,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
+- `zss::Array{Float32,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) The subimages along the track (1D pointer for 4D array; nsx * nsy * (ntrac+1) * len.
+- `score_ary::Array{Float32,4}`: (optional, if non-`nothing`) (Diagnosis output if wanted) the entire scores (1D pointer for 4D array; (x-sliding size) * (y-sliding size) * (ntrac+1) * len.
 """
 function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_score_ary::Bool)
     len = length(tid0)
@@ -1176,7 +1176,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
 
     if out_score_ary
         shape2 = [o.ntrac, 2o.iyhw+1, 2o.ixhw+1, len]
-        score_ary = fill(fmiss, shape2...)
+        score_ary = fill(Float32(fmiss), shape2...)
     else
         score_ary = nothing
     end
@@ -1190,9 +1190,6 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
     chk_vchange = (o.vxch > 0.0 && o.vych > 0.0)
 
     status = zeros(len)
-    if !out_score_ary
-        scr = zeros(lw, kw)
-    end
 
     # record initial data
     if o.subgrid # initial position
