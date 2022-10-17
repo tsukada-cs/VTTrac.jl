@@ -998,6 +998,9 @@ function find_score_peak(o::VTT, scr::Matrix{Float32}, kw::Int, lw::Int)
     else
         l_and_k = findlast(x->x==maximum(scr), scr)
     end
+    if isnothing(l_and_k)
+        return stat, nothing, nothing, nothing
+    end
     scrp = scr[l_and_k]
     lpi, kpi = l_and_k[1], l_and_k[2]
 
