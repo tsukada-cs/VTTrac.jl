@@ -663,6 +663,12 @@ function sliding_xcor(o::VTT, sigx::Real, xd::Matrix{Float32}, tid::Int, k0::Int
             ymean += ydiff/nsxy # ymean is renewed.
             vyy = vyy + yydiff/nsxy - ymean^2 #new mean(y^2) - new ymean^2
             
+            if vyy <= 0
+                scr[l+1,k+1] = o.fmiss
+                vyy = 0
+                continue
+            end
+            
             yd = sub_at_kl .- ymean
             xysum = sum(xd .* yd)
             vxy = xysum/nsxy
