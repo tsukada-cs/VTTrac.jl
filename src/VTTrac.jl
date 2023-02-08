@@ -14,7 +14,7 @@ mutable struct VTT
     z::Array{Float32,3}
     visible::Union{BitArray{3}, Array{Bool,3}}
     t::Vector{Float64}
-    dtmean::Float64
+    dtmax::Float64
     zmiss::Float32
     fmiss::Float64
     imiss::Int
@@ -24,8 +24,8 @@ mutable struct VTT
     chk_mask::Bool # if true, check mask in `mask` (mask of image)
     nsx::Int # sub-image size x
     nsy::Int # sub-image size y
-    vxhw::Float64  # velocities corresponding to `ixhw` through `dtmean`
-    vyhw::Float64  # velocities corresponding to `iyhw` through `dtmean`
+    vxhw::Float64  # velocities corresponding to `ixhw` through `dtmax`
+    vyhw::Float64  # velocities corresponding to `iyhw` through `dtmax`
     ixhw::Int # max displacement x for template matching
     iyhw::Int # max displacement y for template matching
     vxch::Float64
@@ -68,7 +68,7 @@ mutable struct VTT
         end
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
-        o.dtmean = (t[end]-t[begin])/(o.nt-1)
+        o.dtmax = maximum(t[begin+1:end]-t[begin:end-1])
 
         if isnothing(zmiss)
             o.chk_zmiss = false
@@ -215,8 +215,8 @@ Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
 function set_ixyhw_from_v!(o::VTT, vxhw::Float64, vyhw::Float64)
     o.vxhw = vxhw
     o.vyhw = vyhw
-    o.ixhw = ceil(abs(vxhw * o.dtmean)) + 1 # max displacement
-    o.iyhw = ceil(abs(vyhw * o.dtmean)) + 1 # +1 is margin to find peak
+    o.ixhw = ceil(abs(vxhw * o.dtmax)) + 1 # max displacement
+    o.iyhw = ceil(abs(vyhw * o.dtmax)) + 1 # +1 is margin to find peak
 end
 
 """
@@ -232,8 +232,8 @@ Sets the tracking parameters `i[xy]hw`.
 function set_ixyhw_directly!(o::VTT, ixhw::Int, iyhw::Int)
     o.ixhw = ixhw
     o.iyhw = iyhw
-    o.vxhw = ixhw/o.dtmean - 1 # max displacement
-    o.vyhw = iyhw/o.dtmean - 1 # -1 is from margin to find peak
+    o.vxhw = ixhw/o.dtmax - 1 # max displacement
+    o.vyhw = iyhw/o.dtmax - 1 # -1 is from margin to find peak
 end
 
 """
