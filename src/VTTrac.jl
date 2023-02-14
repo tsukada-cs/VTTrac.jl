@@ -32,6 +32,7 @@ mutable struct VTT
     vych::Float64
     itstep::Int
     ntrac::Int
+    maxdt::Real
 
     subgrid::Bool
     subgrid_gaus::Bool #true: subgrid peak finding is by gaussian; false: e-paraboloid
@@ -95,7 +96,7 @@ end
 
 """
     setup(o, nsx, nsy, vxhw, vyhw, [ixhw, iyhw, subgrid, subgrid_gaus,
-        itstep, ntrac, score_method, score_th0, score_th1, vxch, vych,
+        itstep, ntrac, score_method, score_th0, score_th1, vxch, vych, maxdt,
         peak_inside, peak_inside_th, min_contrast, use_init_temp, min_visible])
 
 Setup for tracking.
@@ -121,6 +122,7 @@ Setup for tracking.
     change between two consecutive tracking.
 - `vych::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vy
     change between two consecutive tracking.
+- `maxdt::Union{Real, Nothing}=nothing`: If non-`nothing`, time difference of two image is limited.
 - `peak_inside_th::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
 - `min_contrast::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
@@ -131,7 +133,7 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
             ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, subgrid::Bool=true,
             subgrid_gaus::Bool=false, itstep::Int=1, ntrac::Int=2, score_method::String="xcor",
             score_th0::AbstractFloat=0.8, score_th1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
-            vych::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
+            vych::Union{Real, Nothing}=nothing, maxdt::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
             min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_visible::Int=1)
     o.nsx = nsx
     o.nsy = nsy
@@ -148,6 +150,7 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
 
     vxch === nothing && (vxch = -999.0) # <=0 for nothing (not to set)
     vych === nothing && (vych = -999.0) # <=0 for nothing (not to set)
+    maxdt === nothing && (maxdt = -999.0) # <=0 for nothing (not to set)
 
     if isnothing(peak_inside_th)
         peak_inside_th = -1.0  # negative, meaning unused
@@ -159,7 +162,7 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
     min_contrast = Float32(min_contrast)
     
     set_basic!(o, nsx, nsy, itstep, ntrac)
-    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp, min_visible)
+    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, maxdt, use_init_temp, min_visible)
     o.setuped = true
 end
 
@@ -290,7 +293,7 @@ Sets optional tracking parameters.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
 - `min_visible::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool, min_visible::Int)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, maxdt::Real, use_init_temp::Bool, min_visible::Int)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
@@ -312,6 +315,7 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
 
     o.vxch = vxch # unused if < 0
     o.vych = vych # unused if < 0
+    o.maxdt = maxdt # unused if < 0
     o.use_init_temp = use_init_temp
     o.min_visible = max(min_visible, 1)
 end
@@ -1228,6 +1232,20 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 # @info "(m=$m) Stop tracking at checkpoint 1 (during `inspect_t_index` of `tidf`)"
                 continue
             end
+            # inspect the tracking end time
+            stat = inspect_t_index(o, tidl)
+            if stat
+                status[m] = 5
+                # @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
+                continue
+            end
+            dt = t[tidl] - t[tidf] # time diff. can be negative
+            if o.maxdt > 0 && abs(dt) > o.maxdt
+                status[m] = 11
+                # @info "(m=$m) Stop tracking at checkpoint 11 (during `maxdt` check)"
+                continue
+            end
+            
             if j == 1 || !o.use_init_temp 
                 if o.chk_mask
                     stat, zs0, visible = get_zsub_visible_subgrid(o, tidf, xcur, ycur)
@@ -1271,14 +1289,6 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 end
             end
 
-            # inspect the tracking end time
-            stat = inspect_t_index(o, tidl)
-            if stat
-                status[m] = 5
-                # @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
-                continue
-            end
-            dt = t[tidl] - t[tidf] # time diff. can be negative
             if j == 1
                 vxg = vx0[m]
                 vyg = vy0[m]
