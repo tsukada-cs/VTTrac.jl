@@ -122,7 +122,7 @@ Setup for tracking.
     change between two consecutive tracking.
 - `vych::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vy
     change between two consecutive tracking.
-- `maxdt::Union{Real, Nothing}=nothing`: If non-`nothing`, time difference of two image is limited.
+- `maxdt::Union{Real, Nothing}=nothing`: If non-`nothing`, time difference of two images is limited.
 - `peak_inside_th::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
 - `min_contrast::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
