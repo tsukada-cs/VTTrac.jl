@@ -32,7 +32,7 @@ mutable struct VTT
     vych::Float64
     itstep::Int
     ntrac::Int
-    maxdt::Real
+    maxdt::Float64
 
     subgrid::Bool
     subgrid_gaus::Bool #true: subgrid peak finding is by gaussian; false: e-paraboloid
