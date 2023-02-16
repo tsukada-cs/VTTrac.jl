@@ -293,7 +293,7 @@ Sets optional tracking parameters.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
 - `min_visible::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, maxdt::Real, use_init_temp::Bool, min_visible::Int)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, maxdt::Float64, use_init_temp::Bool, min_visible::Int)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
