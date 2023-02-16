@@ -1240,11 +1240,11 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
             dt = t[tidl] - t[tidf] # time diff. can be negative
-            if o.maxdt > 0 && abs(dt) > o.maxdt
-                status[m] = 11
-                # @info "(m=$m) Stop tracking at checkpoint 11 (during `maxdt` check)"
-                continue
-            end
+            # if o.maxdt > 0 && abs(dt) > o.maxdt
+            #     status[m] = 11
+            #     # @info "(m=$m) Stop tracking at checkpoint 11 (during `maxdt` check)"
+            #     continue
+            # end
             
             if j == 1 || !o.use_init_temp 
                 if o.chk_mask
