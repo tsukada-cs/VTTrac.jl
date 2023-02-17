@@ -1,5 +1,5 @@
 module VTTrac
-export VTT, setup, trac
+export VTT, setup, trac, set_ixyhw_from_v, set_ixyhw_directly
 
 using Printf
 using Statistics
@@ -14,7 +14,7 @@ mutable struct VTT
     z::Array{Float32,3}
     visible::Union{BitArray{3}, Array{Bool,3}}
     t::Vector{Float64}
-    dtmax::Float64
+    dtmean::Float64
     zmiss::Float32
     fmiss::Float64
     imiss::Int
@@ -24,8 +24,8 @@ mutable struct VTT
     chk_mask::Bool # if true, check mask in `mask` (mask of image)
     nsx::Int # sub-image size x
     nsy::Int # sub-image size y
-    vxhw::Float64  # velocities corresponding to `ixhw` through `dtmax`
-    vyhw::Float64  # velocities corresponding to `iyhw` through `dtmax`
+    vxhw::Float64  # velocities corresponding to `ixhw` through `dtmean`
+    vyhw::Float64  # velocities corresponding to `iyhw` through `dtmean`
     ixhw::Int # max displacement x for template matching
     iyhw::Int # max displacement y for template matching
     vxch::Float64
@@ -69,7 +69,7 @@ mutable struct VTT
         end
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
-        o.dtmax = maximum(t[begin+1:end]-t[begin:end-1])
+        o.dtmean = (t[end]-t[begin])/(o.nt-1)
 
         if isnothing(zmiss)
             o.chk_zmiss = false
@@ -140,10 +140,10 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
     if vxhw !== nothing
         ixhw !== nothing && throw(ArgumentError("`v[xy]hw` and `i[xy]hw` must not be set simultaneously"))
         vyhw === nothing && throw(ArgumentError("vxhw and vyhw must be set simultaneously"))
-        set_ixyhw_from_v!(o, vxhw, vyhw)
+        set_ixyhw_from_v(o, vxhw, vyhw)
     elseif ixhw !== nothing
         iyhw === nothing && throw(ArgumentError("ixhw and iyhw must be set simultaneously"))
-        set_ixyhw_directly!(o, ixhw, iyhw)
+        set_ixyhw_directly(o, ixhw, iyhw)
     else
         throw(ArgumentError("either `i[xy]hw` or `v[xy]hw` must be specified"))
     end
@@ -204,7 +204,7 @@ function set_use_init_temp(o::VTT, value::Bool)
 end
 
 """
-    set_ixyhw_from_v!(o, vxch, vyxh)
+    set_ixyhw_from_v(o, vxch, vyxh)
 
 Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
 
@@ -215,15 +215,15 @@ Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
 ```
 
 """
-function set_ixyhw_from_v!(o::VTT, vxhw::Float64, vyhw::Float64)
+function set_ixyhw_from_v(o::VTT, vxhw::Float64, vyhw::Float64)
     o.vxhw = vxhw
     o.vyhw = vyhw
-    o.ixhw = ceil(abs(vxhw * o.dtmax)) + 1 # max displacement
-    o.iyhw = ceil(abs(vyhw * o.dtmax)) + 1 # +1 is margin to find peak
+    o.ixhw = ceil(abs(vxhw * o.dtmean)) + 1 # max displacement
+    o.iyhw = ceil(abs(vyhw * o.dtmean)) + 1 # +1 is margin to find peak
 end
 
 """
-    set_ixyhw_from_v!(o, ixch, iyxh)
+    set_ixyhw_from_v(o, ixch, iyxh)
 
 Sets the tracking parameters `i[xy]hw`.
 
@@ -232,11 +232,11 @@ Sets the tracking parameters `i[xy]hw`.
 - `ixhw::Float64`: The range over which next x is searched around initial guess.
 - `iyhw`::Float64: The range over which next y is searched around initial guess.
 """
-function set_ixyhw_directly!(o::VTT, ixhw::Int, iyhw::Int)
+function set_ixyhw_directly(o::VTT, ixhw::Int, iyhw::Int)
     o.ixhw = ixhw
     o.iyhw = iyhw
-    o.vxhw = ixhw/o.dtmax - 1 # max displacement
-    o.vyhw = iyhw/o.dtmax - 1 # -1 is from margin to find peak
+    o.vxhw = ixhw/o.dtmean - 1 # max displacement
+    o.vyhw = iyhw/o.dtmean - 1 # -1 is from margin to find peak
 end
 
 """

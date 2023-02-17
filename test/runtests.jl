@@ -31,7 +31,7 @@ using Statistics
         @test vtt.nt == nt
         @test vtt.ny == ny
         @test vtt.nx == nx
-        @test vtt.dtmax == 1
+        @test vtt.dtmean == 1
         @test vtt.chk_zmiss == true
         @test vtt.setuped == false
 
