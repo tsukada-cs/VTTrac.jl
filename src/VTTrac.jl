@@ -172,6 +172,12 @@ end
 function set_nsy(o::VTT, value::Int)
     o.nsy = value
 end
+function set_ixhw(o::VTT, value::Int)
+    o.ixhw = value
+end
+function set_iyhw(o::VTT, value::Int)
+    o.iyhw = value
+end
 function set_itstep(o::VTT, value::Int)
     o.itstep = value
 end
