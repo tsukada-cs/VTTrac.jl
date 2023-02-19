@@ -1080,13 +1080,13 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
     size(y) != sh && throw(ArgumentError("Shape miss-match (y)"))
     
     if isnothing(vxg)
-        vxg = fill(o.fmiss, sh...)
+        vxg = fill(0.0, sh...)
     else
         size(vxg) !== sh && throw(ArgumentError("Shape miss-match (vxg)"))
     end
 
     if isnothing(vyg)
-        vyg = fill(o.fmiss, sh...)
+        vyg = fill(0.0, sh...)
     else
         size(vyg) !== sh && throw(ArgumentError("Shape miss-match (vyg)"))
     end
@@ -1269,15 +1269,6 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 end
             end
 
-            # inspect the tracking end time
-            stat = inspect_t_index(o, tidl)
-            if stat
-                status[m] = 5
-                # @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
-                continue
-            end
-            dt = t[tidl] - t[tidf] # time diff. can be negative
-
             if out_subimage
                 if j == 1 || !o.use_init_temp
                     zss[j,:,:,m] = zs0
@@ -1287,6 +1278,15 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 end
             end
 
+            # inspect the tracking end time
+            stat = inspect_t_index(o, tidl)
+            if stat
+                status[m] = 5
+                # @info "(m=$m) Stop tracking at checkpoint 5 (during `inspect_t_index` of `tidl`)"
+                continue
+            end
+            dt = t[tidl] - t[tidf] # time diff. can be negative
+            
             if j == 1
                 vxg = vx0[m]
                 vyg = vy0[m]
