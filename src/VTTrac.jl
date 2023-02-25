@@ -1274,6 +1274,11 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                     zss[j,:,:,m] = zs0
                 else
                     stat, zsw = get_zsub_subgrid(o, tidf, xcur, ycur)
+                    if stat
+                        status[m] = 2
+                        # @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
+                        continue
+                    end
                     zss[j,:,:,m] = zsw
                 end
             end
@@ -1353,6 +1358,11 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 xcur = @inbounds x[j+1,m]
                 ycur = @inbounds y[j+1,m]
                 stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
+                if stat
+                    status[m] = 2
+                    # @info "(m=$m) Stop tracking at checkpoint 2 (during `get_zsub_subgrid`)"
+                    continue
+                end
                 zss[j+1,:,:,m] .= zs0
             end
         end
