@@ -1353,7 +1353,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 xcur = @inbounds x[j+1,m]
                 ycur = @inbounds y[j+1,m]
                 stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
-                zss[j+1,:,:,m] = zs0
+                zss[j+1,:,:,m] .= zs0
             end
         end
     end   
