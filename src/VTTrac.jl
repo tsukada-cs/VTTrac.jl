@@ -68,7 +68,6 @@ mutable struct VTT
         end
         size(t) !== (o.nt,) && throw(ArgumentError("`size(t)` must be `(size(z)[begin],1)`"))
         o.t = t
-        o.dtmean = (t[end]-t[begin])/(o.nt-1)
 
         if isnothing(zmiss)
             o.chk_zmiss = false
@@ -135,6 +134,7 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
             min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_visible::Int=1)
     o.nsx = nsx
     o.nsy = nsy
+    o.dtmean = itstep * (o.t[end]-o.t[begin]) / (o.nt-1)
     if vxhw !== nothing
         ixhw !== nothing && throw(ArgumentError("`v[xy]hw` and `i[xy]hw` must not be set simultaneously"))
         vyhw === nothing && throw(ArgumentError("vxhw and vyhw must be set simultaneously"))

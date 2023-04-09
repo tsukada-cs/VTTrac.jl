@@ -31,7 +31,6 @@ using Statistics
         @test vtt.nt == nt
         @test vtt.ny == ny
         @test vtt.nx == nx
-        @test vtt.dtmean == 1
         @test vtt.chk_zmiss == true
         @test vtt.setuped == false
 
@@ -44,9 +43,9 @@ using Statistics
         
 
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3)
+        @test vtt.dtmean == 1
         @test vtt.vxhw == 2.0
         @test vtt.vyhw == 2.0
-        
 
         VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ntrac=ntrac, subgrid=false, subgrid_gaus=true, use_init_temp=false, score_method="xcor")
         @test vtt.ixhw == 3
