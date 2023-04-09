@@ -42,8 +42,12 @@ using Statistics
         @test_throws ArgumentError VTTrac.setup(vtt, nsx, nsy; vxhw=1.8, vyhw=1.8, ixhw=3, iyhw=3)
         
 
+        VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3, itstep=5)
+        @test vtt.dtmean == 5
+
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3)
         @test vtt.dtmean == 1
+
         @test vtt.vxhw == 2.0
         @test vtt.vyhw == 2.0
 
