@@ -52,14 +52,14 @@ mutable struct VTT
     Sets data for tracking (you need to set parameters separately).
     
     # Arguments
-    - `z::Array{Float32,3}`: Array of image-like data (in dimensions [time, y, x]). `z[i]` contains `i`-th image data.
-    - `t::Vector{Float64}`: Times at which the images are for.
+    - `z::AbstractArray{Float32,3}`: Array of image-like data (in dimensions [time, y, x]). `z[i]` contains `i`-th image data.
+    - `t::AbstractVector{Float64}`: Times at which the images are for.
     - `zmiss::Union{Real, Nothing}=nothing`: Missing value used in `z`.
     - `mask::Union{Array{Bool,3}, Nothing}=nothing`: Mask to ignore when calculate score (true positions are ignored).
     - `fmiss::Real=-999.0`: Missing value to be set for Real.
     - `imiss::Integer=-999`: Missing value to be set for Integer.
     """
-    function VTT(z::Array{Float32,3}; t::Union{Vector{Float64}, Nothing}=nothing, mask::Union{BitArray{3}, Array{Bool,3}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
+    function VTT(z::AbstractArray{Float32,3}; t::Union{AbstractVector{Float64}, Nothing}=nothing, mask::Union{BitArray{3}, Array{Bool,3}, Nothing}=nothing, zmiss::Union{Real, Nothing}=nothing, fmiss::Real=-999.0, imiss::Int=-999)
         o = new()
         o.z = z
         o.nt, o.ny, o.nx = size(z)
