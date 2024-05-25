@@ -1,7 +1,6 @@
 ```@meta
 CurrentModule = VTTrac
 ```
-
 # VTTrac
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://tsukada-cs.github.io/VTTrac.jl/stable)
