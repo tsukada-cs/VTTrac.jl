@@ -19,6 +19,5 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/tsukada-cs/VTTrac.jl",
-    devbranch = "main",
+    repo = "github.com/tsukada-cs/VTTrac.jl.git",
 )
