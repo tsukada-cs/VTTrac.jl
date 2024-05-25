@@ -6,6 +6,7 @@ using Statistics
 
 import Logging
 
+
 mutable struct VTT
     # data on which tracking is made
     nx::Int # image size x
@@ -47,10 +48,10 @@ mutable struct VTT
     min_visible::Int # minimum number of visible values to calculate score when `chk_mask` is true.
 
     """
-        VTT(z[, t, visible, zmiss, fmiss, imiss])
-    
+    VTT(z[, t, visible, zmiss, fmiss, imiss])
+
     Sets data for tracking (you need to set parameters separately).
-    
+
     # Arguments
     - `z::AbstractArray{Float32,3}`: Array of image-like data (in dimensions [time, y, x]). `z[i]` contains `i`-th image data.
     - `t::AbstractVector{Float64}`: Times at which the images are for.
@@ -1063,9 +1064,9 @@ Conduct tracking.
 - `vx::Matrix{Float64}`: [ntrac, len] Derived x-velocity.
 - `vy::Matrix{Float64}`: [ntrac, len] Derived y-velocity.
 - `score::Matrix{Float64}`: [ntrac, len] Scores along the trajectory (max values, possibly at subgrid).
-- `zss::Array{Float32,4}`: [nsx, nsy, ntrac+1, len] (optional, if non-`nothing`)
+- `zss::Array{Float32,4}`: [nsx, nsy, ntrac+1, len] optional, if non-`nothing`
     (Diagnosis output if wanted) The subimages along the track.
-- `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] (optional, if non-`nothing`)
+- `score_arry::Array{Float64,4}`: [(x-sliding size, y-sliding size, ntrac+1, len] optional, if non-`nothing`
     (Diagnosis output if wanted) The entire scores.
 """
 function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=false, out_score_ary::Bool=false, to_missing::Bool=true)
