@@ -6,15 +6,12 @@ using Documenter
 DocMeta.setdocmeta!(VTTrac, :DocTestSetup, :(using VTTrac); recursive=true)
 
 makedocs(
-    modules=[VTTrac],
-    authors="tsukada-cs <tsukada.cs@gmail.com> and contributors",
-    repo="https://github.com/tsukada-cs/VTTrac.jl/blob/{commit}{path}#{line}",
-    sitename="VTTrac.jl",
-    format=Documenter.HTML(;
+    sitename = "VTTrac.jl",
+    format = Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://tsukada-cs.github.io/VTTrac.jl",
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
         "How to Use" => "howtouse.md",
         "References" => "references.md",
@@ -22,6 +19,6 @@ makedocs(
 )
 
 deploydocs(
-    repo="github.com/tsukada-cs/VTTrac.jl",
-    devbranch="main",
+    repo = "github.com/tsukada-cs/VTTrac.jl",
+    devbranch = "main",
 )
