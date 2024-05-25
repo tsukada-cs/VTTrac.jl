@@ -1,3 +1,5 @@
+push!(LOAD_PATH,"../src/")
+
 using VTTrac
 using Documenter
 
@@ -11,11 +13,11 @@ makedocs(
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://tsukada-cs.github.io/VTTrac.jl",
-        assets=String[],
     ),
     pages=[
         "Home" => "index.md",
         "How to Use" => "howtouse.md",
+        "References" => "references.md",
     ],
 )
 
