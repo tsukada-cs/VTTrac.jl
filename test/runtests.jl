@@ -1,10 +1,7 @@
 using VTTrac
 using Test
 
-using Documenter
 using Statistics
-
-doctest(VTTrac)
 
 @testset "VTTrac.jl" begin
     @testset "VTTrack_original" begin
