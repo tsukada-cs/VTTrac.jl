@@ -1,5 +1,3 @@
-push!(LOAD_PATH,"../src/")
-
 using VTTrac
 using Documenter
 
@@ -20,4 +18,5 @@ makedocs(
 
 deploydocs(
     repo = "github.com/tsukada-cs/VTTrac.jl.git",
+    branch = "gh-pages",
 )
