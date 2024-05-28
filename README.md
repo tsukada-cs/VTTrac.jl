@@ -27,3 +27,7 @@ You can contribute to this package by opening issues on GitHub or implementing t
 ## Related packages
 * `VTTrac` by Takeshi Horinouchi: https://github.com/thorinouchi/VTTrac
 * `pyVTTrac` by Taiga Tsukada: https://github.com/tsukada-cs/pyVTTrac
+
+## References
+* Horinouchi, T., S. Tsujino, M. Hayashi, U. Shimada, W. Yanase, A. Wada, and H. Yamada, 2023: Stationary and Transient Asymmetric Features in Tropical Cyclone Eye with Wavenumber-1 Instability: Case Study for Typhoon Haishen (2020) with Atmospheric Motion Vectors from 30-Second Imaging. Monthly Weather Review, 151, 253–273, https://doi.org/10.1175/MWR-D-22-0179.1.
+* Tsukada, T., T. Horinouchi, and S. Tsujino, 2024: Wind Distribution in the Eye of Tropical Cyclone Revealed by a Novel Atmospheric Motion Vector Derivation. JGR Atmospheres, 129, e2023JD040585, https://doi.org/10.1029/2023JD040585.
