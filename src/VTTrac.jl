@@ -37,15 +37,15 @@ mutable struct VTT
     subgrid::Bool
     subgrid_gaus::Bool #true: subgrid peak finding is by gaussian; false: e-paraboloid
     score_method::String
-    score_th0::AbstractFloat
-    score_th1::AbstractFloat
+    Sth0::AbstractFloat
+    Sth1::AbstractFloat
     chk_peak_inside::Bool
     peak_inside_th::Float32 #threshold for the peak-inside screening(unused if<0)
-    chk_min_contrast::Bool
-    min_contrast::Float32 # minimum contrast in the template (unused if=<0)
+    chk_Cth::Bool
+    Cth::Float32 # minimum contrast in the template (unused if=<0)
     use_init_temp::Bool # if true, always use initial template submimages
     setuped::Bool
-    min_visible::Int # minimum number of visible values to calculate score when `chk_mask` is true.
+    min_samples::Int # minimum number of visible values to calculate score when `chk_mask` is true.
 
     """
     VTT(z[, t, visible, zmiss, fmiss, imiss])
@@ -95,8 +95,8 @@ end
 
 """
     setup(o, nsx, nsy, vxhw, vyhw, [ixhw, iyhw, subgrid, subgrid_gaus,
-        itstep, ntrac, score_method, score_th0, score_th1, vxch, vych,
-        peak_inside, peak_inside_th, min_contrast, use_init_temp, min_visible])
+        itstep, ntrac, score_method, Sth0, Sth1, vxch, vych,
+        peak_inside, peak_inside_th, Cth, use_init_temp, min_samples])
 
 Setup for tracking.
 
@@ -115,24 +115,24 @@ Setup for tracking.
 - `itstep::Integer=1`: Step of `t`'s used (skip if >1).
 - `ntrack::Integer=2`: Max tracking times from initial loc.
 - `score_method::String="xcor"`: `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
-- `score_th0::AbstractFloat=0.8`: The minimum score required for the 1st tracking.
-- `score_th1::AbstractFloat=0.7`: The minimum score required for subsequent tracking.
+- `Sth0::AbstractFloat=0.8`: The minimum score required for the 1st tracking.
+- `Sth1::AbstractFloat=0.7`: The minimum score required for subsequent tracking.
 - `vxch::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vx
     change between two consecutive tracking.
 - `vych::Union{Real, Nothing}=nothing`: If non-`nothing`, the max tolerant vy
     change between two consecutive tracking.
 - `peak_inside_th::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
-- `min_contrast::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
+- `Cth::Union{Real, Nothing}=nothing`: If non-`nothing`, an initial template is used only when 
     it has a difference in max and min greater than its value.
-- `min_visible::Int=1`: Minimum number of visible values to calculate score when `chk_mask` is true.
+- `min_samples::Int=1`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
 function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing,
             ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, subgrid::Bool=true,
             subgrid_gaus::Bool=false, itstep::Int=1, ntrac::Int=2, score_method::String="xcor",
-            score_th0::AbstractFloat=0.8, score_th1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
+            Sth0::AbstractFloat=0.8, Sth1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
             vych::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
-            min_contrast::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_visible::Int=1)
+            Cth::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_samples::Int=1)
     o.nsx = nsx
     o.nsy = nsy
     o.dtmean = itstep * (o.t[end]-o.t[begin]) / (o.nt-1)
@@ -154,13 +154,13 @@ function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, v
         peak_inside_th = -1.0  # negative, meaning unused
     end
     peak_inside_th = Float32(peak_inside_th)
-    if isnothing(min_contrast)
-        min_contrast = -1.0   # negative, meaning unused
+    if isnothing(Cth)
+        Cth = -1.0   # negative, meaning unused
     end
-    min_contrast = Float32(min_contrast)
+    Cth = Float32(Cth)
     
     set_basic!(o, nsx, nsy, itstep, ntrac)
-    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp, min_visible)
+    set_optional!(o, subgrid, subgrid_gaus, score_method, Sth0, Sth1, peak_inside_th, Cth, vxch, vych, use_init_temp, min_samples)
     o.setuped = true
 end
 
@@ -191,17 +191,17 @@ end
 function set_score_method(o::VTT, value::String)
     o.score_method = value
 end
-function set_score_th0(o::VTT, value::Real)
-    o.score_th0 = value
+function set_Sth0(o::VTT, value::Real)
+    o.Sth0 = value
 end
-function set_score_th1(o::VTT, value::Real)
-    o.score_th1 = value
+function set_Sth1(o::VTT, value::Real)
+    o.Sth1 = value
 end
 function set_peak_inside_th(o::VTT, value::Real)
     o.peak_inside_th = value
 end
-function set_min_contrast(o::VTT, value::Real)
-    o.min_contrast = value
+function set_Cth(o::VTT, value::Real)
+    o.Cth = value
 end
 function set_use_init_temp(o::VTT, value::Bool)
     o.use_init_temp = value
@@ -265,17 +265,17 @@ function set_basic!(o::VTT, nsx::Int, nsy::Int, itstep::Int, ntrac::Int)
     o.subgrid = true
     o.subgrid_gaus = false
     o.score_method = "xcor"
-    o.score_th0 = 0.8
-    o.score_th1 = 0.7
+    o.Sth0 = 0.8
+    o.Sth1 = 0.7
     o.peak_inside_th = Float32(0.03) # unused if < 0
-    o.min_contrast = Float32(-999.0) # unused if < 0
+    o.Cth = Float32(-999.0) # unused if < 0
     o.vxch = -999.0 # unused if < 0
     o.vych = -999.0 # unused if < 0
     o.use_init_temp = false
 end
 
 """
-    set_optional!(o, subgrid, subgrid_gaus, score_method, score_th0, score_th1, peak_inside_th, min_contrast, vxch, vych, use_init_temp)
+    set_optional!(o, subgrid, subgrid_gaus, score_method, Sth0, Sth1, peak_inside_th, Cth, vxch, vych, use_init_temp)
 
 Sets optional tracking parameters.
 
@@ -284,25 +284,25 @@ Sets optional tracking parameters.
 - `subgrid::Bool`: Whether to conduct subgrid tracking.
 - `subgrid_gaus::Bool`: Whether subgrid peak finding is by gaussian.
 - `score_method::String`: Scoring method (such as xcor for cross-correlation).
-- `score_th0::AbstractFloat`: (Result screening parameter) Minimum score required for the first-time tracking.
-- `score_th1::AbstractFloat`: (Result screening parameter) Minimum score required for the subsequent tracking.
+- `Sth0::AbstractFloat`: (Result screening parameter) Minimum score required for the first-time tracking.
+- `Sth1::AbstractFloat`: (Result screening parameter) Minimum score required for the subsequent tracking.
 - `peak_inside_th::Real`: An initial template is used only when
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
-- `min_contrast::Real`: An initial template is used only when 
+- `Cth::Real`: An initial template is used only when 
     it has a difference in max and min greater than its value.
 - `vxch::Float64`: (Result screening parameter) If positive, tracking result is rejected if the vx 
     chnages along trajecty greather than this value (thus used only when ntrac>=2). As a special case, 
     if the result of the second tracking is rejected, the first one is also rejected, since there is 
     no consecutive consistent result in this case.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
-- `min_visible::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
+- `min_samples::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
-function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, score_th0::AbstractFloat, score_th1::AbstractFloat, peak_inside_th::Real, min_contrast::Real, vxch::Float64, vych::Float64, use_init_temp::Bool, min_visible::Int)
+function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::String, Sth0::AbstractFloat, Sth1::AbstractFloat, peak_inside_th::Real, Cth::Real, vxch::Float64, vych::Float64, use_init_temp::Bool, min_samples::Int)
     o.subgrid = subgrid
     o.subgrid_gaus = subgrid_gaus
     o.score_method = score_method
-    o.score_th0 = score_th0
-    o.score_th1 = score_th1
+    o.Sth0 = Sth0
+    o.Sth1 = Sth1
     if peak_inside_th > 0.0
         o.chk_peak_inside = true
     else
@@ -310,17 +310,17 @@ function set_optional!(o::VTT, subgrid::Bool, subgrid_gaus::Bool, score_method::
     end
     o.peak_inside_th = Float32(peak_inside_th)
 
-    if min_contrast > 0.0
-        o.chk_min_contrast = true
+    if Cth > 0.0
+        o.chk_Cth = true
     else
-        o.chk_min_contrast = false
+        o.chk_Cth = false
     end
-    o.min_contrast = Float32(min_contrast)
+    o.Cth = Float32(Cth)
 
     o.vxch = vxch # unused if < 0
     o.vych = vych # unused if < 0
     o.use_init_temp = use_init_temp
-    o.min_visible = max(min_visible, 1)
+    o.min_samples = max(min_samples, 1)
 end
 
 """To check whether a time index is valid. Returns `false` if valid, `true` if not."""
@@ -813,7 +813,7 @@ function get_score_xcor_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if sum(visible_and_visible) < o.min_visible
+            if sum(visible_and_visible) < o.min_samples
                 continue
             end
             scr[l+1,k+1] = cor(x[visible_and_visible], sub_at_kl[visible_and_visible])
@@ -865,7 +865,7 @@ function get_score_ncov_with_visible(o::VTT, x::AbstractMatrix{Float32}, visible
             sub_at_kl = @inbounds @view o.z[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_at_kl = @inbounds @view o.visible[tid, l0+l:l0+l+nsy-1, k0+k:k0+k+nsx-1]
             visible_and_visible = visible .* visible_at_kl
-            if sum(visible_and_visible) < o.min_visible
+            if sum(visible_and_visible) < o.min_samples
                 continue
             end
             x_valid = x[visible_and_visible]
@@ -1240,7 +1240,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 if o.chk_mask
                     stat, zs0, visible = get_zsub_visible_subgrid(o, tidf, xcur, ycur)
                     if !stat
-                        stat = sum(visible) < o.min_visible
+                        stat = sum(visible) < o.min_samples
                     end
                 else
                     stat, zs0 = get_zsub_subgrid(o, tidf, xcur, ycur)
@@ -1253,10 +1253,10 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 continue
             end
 
-            if o.chk_min_contrast
-                if maximum(zs0) - minimum(zs0) < o.min_contrast
+            if o.chk_Cth
+                if maximum(zs0) - minimum(zs0) < o.Cth
                     status[m] = 3
-                    # @info "(m=$m) Stop tracking at checkpoint 3 (during `min_contrast` check)"
+                    # @info "(m=$m) Stop tracking at checkpoint 3 (during `Cth` check)"
                     continue
                 end
             end
@@ -1326,9 +1326,9 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
                 # @info "(m=$m) Stop tracking at checkpoint 7 (during `find_score_peak`)"
                 continue
             end
-            if ((j==1 && sp<o.score_th0) || (j>1 && sp<o.score_th1))
+            if ((j==1 && sp<o.Sth0) || (j>1 && sp<o.Sth1))
                 status[m] = 8
-                # @info "(m=$m) Stop tracking at checkpoint 8 (during `score_th0` or `score_th1` check)"
+                # @info "(m=$m) Stop tracking at checkpoint 8 (during `Sth0` or `Sth1` check)"
                 continue
             end
             score[j,m] = Float32(sp)

@@ -55,7 +55,7 @@ using Statistics
         @test vtt.ixhw == 3
         @test vtt.iyhw == 3
         @test vtt.peak_inside_th == -1.0f0
-        @test vtt.min_contrast == -1.0f0
+        @test vtt.Cth == -1.0f0
 
 
         n = 6
@@ -86,13 +86,13 @@ using Statistics
         @test 1.19 < mean(vy) < 1.21
 
 
-        vtt.chk_min_contrast = true
-        vtt.min_contrast = 1.6
+        vtt.chk_Cth = true
+        vtt.Cth = 1.6
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test count !== fill(nt, n)
         @test 3 in status
-        vtt.chk_min_contrast = false
-        vtt.min_contrast = -1.0
+        vtt.chk_Cth = false
+        vtt.Cth = -1.0
 
 
         vtt.score_method = "ncov"
@@ -170,10 +170,10 @@ using Statistics
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test vtt.visible == .!mask # Check to see if the view is being written.
         
-        vtt.min_visible = vtt.nsx * vtt.nsy
+        vtt.min_samples = vtt.nsx * vtt.nsy
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
         @test any(ismissing.(score_ary))
-        vtt.min_visible = 1
+        vtt.min_samples = 1
 
         mask = trues(size(z)) # all masked
         vtt.visible = .!(mask)
