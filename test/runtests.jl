@@ -43,7 +43,7 @@ using Statistics
         
 
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3, itstep=5)
-        @test vtt.dtmean == 1.0
+        @test vtt.dtmean == 5.0
 
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3)
         @test vtt.dtmean == 1
