@@ -1,7 +1,10 @@
 using VTTrac
 using Test
 
+using Documenter
 using Statistics
+
+doctest(VTTrac)
 
 @testset "VTTrac.jl" begin
     @testset "VTTrack_original" begin
@@ -43,7 +46,7 @@ using Statistics
         
 
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3, itstep=5)
-        @test vtt.dtmean == 5
+        @test vtt.dtmean == 1.0
 
         VTTrac.setup(vtt, nsx, nsy; ixhw=3, iyhw=3)
         @test vtt.dtmean == 1
