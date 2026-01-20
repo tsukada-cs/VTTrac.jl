@@ -103,7 +103,7 @@ Setup for tracking.
 # Arguments
 - `o::VTT`: The object.
 - `nsx::Integer, nsy::Integer`: Submimage x & y sizes (x:1st, y:2nd dim).
-- `vxch::Union{Real, Nothing}, vyhw::Union{Real, Nothing}`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
+- `vxhw::Union{Real, Nothing}, vyhw::Union{Real, Nothing}`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
     the dimensions along which to perform the computation.
     search velocity range half sizes to set `i[xy]hw`.
     Seach at least to cover +-v?hw around the first guess or previous step.
@@ -208,7 +208,7 @@ function set_use_init_temp(o::VTT, value::Bool)
 end
 
 """
-    set_ixyhw_from_v(o, vxch, vyxh)
+    set_ixyhw_from_v(o, vxhw, vyhw)
 
 Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
 
