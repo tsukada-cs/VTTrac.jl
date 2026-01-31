@@ -127,12 +127,20 @@ Setup for tracking.
     it has a difference in max and min greater than its value.
 - `min_samples::Int=1`: Minimum number of visible values to calculate score when `chk_mask` is true.
 """
-function setup(o::VTT, nsx::Int, nsy::Int; vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing,
-            ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, subgrid::Bool=true,
-            subgrid_gaus::Bool=false, itstep::Int=1, ntrac::Int=2, score_method::String="xcor",
-            Sth0::AbstractFloat=0.8, Sth1::AbstractFloat=0.7, vxch::Union{Real, Nothing}=nothing,
-            vych::Union{Real, Nothing}=nothing, peak_inside_th::Union{Real, Nothing}=nothing,
-            Cth::Union{Real, Nothing}=nothing, use_init_temp::Bool=false, min_samples::Int=1)
+function setup(
+    o::VTT, nsx::Int, nsy::Int; 
+    vxhw::Union{Real, Nothing}=nothing, vyhw::Union{Real, Nothing}=nothing,
+    ixhw::Union{Int, Nothing}=nothing, iyhw::Union{Int, Nothing}=nothing, 
+    subgrid::Bool=true, subgrid_gaus::Bool=false, 
+    itstep::Int=1, ntrac::Int=2, 
+    score_method::String="xcor",
+    Sth0::AbstractFloat=0.8, Sth1::AbstractFloat=0.7, 
+    vxch::Union{Real, Nothing}=nothing, vych::Union{Real, Nothing}=nothing, 
+    peak_inside_th::Union{Real, Nothing}=nothing,
+    Cth::Union{Real, Nothing}=nothing, 
+    use_init_temp::Bool=false, 
+    min_samples::Int=1
+    )
     o.nsx = nsx
     o.nsy = nsy
     o.dtmean = itstep * (o.t[end]-o.t[begin]) / (o.nt-1)
@@ -239,8 +247,8 @@ Sets the tracking parameters `i[xy]hw`.
 function set_ixyhw_directly(o::VTT, ixhw::Int, iyhw::Int)
     o.ixhw = ixhw
     o.iyhw = iyhw
-    o.vxhw = ixhw/o.dtmean - 1 # max displacement
-    o.vyhw = iyhw/o.dtmean - 1 # -1 is from margin to find peak
+    o.vxhw = (ixhw - 1) / o.dtmean # max displacement
+    o.vyhw = (iyhw - 1) / o.dtmean # -1 is from margin to find peak
 end
 
 """
