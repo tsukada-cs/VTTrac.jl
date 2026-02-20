@@ -133,6 +133,23 @@ using Statistics
         @test size(score) == (ntrac, n1, n2)
         @test size(zss) == (ntrac+1, nsy, nsx, n1, n2)
         @test size(score_ary) == (ntrac, 2vtt.iyhw+1, 2vtt.ixhw+1, n1, n2)
+        
+        # Test chk_zsub_peak_inside_function
+        vtt.peak_inside_th = 0.1f0
+        zs_peak = [
+            0.0f0 0.0f0 0.0f0; 
+            0.0f0 1.0f0 0.0f0; 
+            0.0f0 0.0f0 0.0f0
+        ]
+        @test VTTrac.chk_zsub_peak_inside(vtt, zs_peak) == false
+        zs_flat = ones(Float32, 3, 3)
+        @test VTTrac.chk_zsub_peak_inside(vtt, zs_flat) == true
+        zs_trough = [
+            1.0f0 1.0f0 1.0f0; 
+            1.0f0 0.0f0 1.0f0; 
+            1.0f0 1.0f0 1.0f0
+        ]
+        @test VTTrac.chk_zsub_peak_inside(vtt, zs_trough) == false
     end
 
     @testset "VTTrack_with_mask" begin
