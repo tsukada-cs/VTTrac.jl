@@ -587,9 +587,9 @@ end
 """
     chk_zsub_peak_inside(o, zs)
 
-Check whether the template subimage is peaked (maximized or minimized)
-inside, and the peak is conspicuous enough, having a difference from the 
-max or min on the sides greater than peak_inside_th*(inside_max - inside_min).
+Check if the subimage has a prominent peak or trough in its interior.
+A peak or trough is considered prominent if its value differs from the boundary 
+extremes by more than `o.peak_inside_th` times the interior data range.
 
 # Caution
 If `o.peak_inside_th` < 0, no checking is conducted.
@@ -599,12 +599,14 @@ If `o.peak_inside_th` < 0, no checking is conducted.
 """
 function chk_zsub_peak_inside(o::VTT, zs::AbstractMatrix{Float32})
     # find max and min along sides
-    side_max = maximum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
-    side_min = minimum([zs[begin,:]; zs[end,:]; zs[begin+1:end-1,begin]; zs[begin+1:end-1,end]])
+    side_max = max(maximum(@view zs[begin, :]), maximum(@view zs[end, :]),
+                   maximum(@view zs[begin+1:end-1, begin]), maximum(@view zs[begin+1:end-1, end]))
+    side_min = min(minimum(@view zs[begin, :]), minimum(@view zs[end, :]),
+                   minimum(@view zs[begin+1:end-1, begin]), minimum(@view zs[begin+1:end-1, end]))
 
     # find max and min inside the sides
-    inner_max = maximum([zs[begin+1,begin+1:end-1]; zs[end-1,begin+1:end-1]; zs[begin+2:end-2,begin+1]; zs[begin+2:end-2,end-1]])
-    inner_min = minimum([zs[begin+1,begin+1:end-1]; zs[end-1,begin+1:end-1]; zs[begin+2:end-2,begin+1]; zs[begin+2:end-2,end-1]])
+    inner_max = maximum(@view zs[begin+1:end-1,begin+1:end-1])
+    inner_min = minimum(@view zs[begin+1:end-1,begin+1:end-1])
 
     if (inner_max > side_max + o.peak_inside_th*(inner_max-inner_min) || inner_min < side_min - o.peak_inside_th*(inner_max-inner_min))
         return false # OK, because the max or min is inside and the difference from the max or min on the sides is not too tiny
