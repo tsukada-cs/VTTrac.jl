@@ -63,6 +63,7 @@ using Statistics
         x0 = 1 .+ [0:n-1;]*2.5 .+ 7.5
         y0 = 1 .+ [0:n-1;]*1.0 .+ 10.5
         count, status, tid, x, y, vx, vy, score, zss, score_ary = VTTrac.trac(vtt, tid0, x0, y0, out_subimage=true, out_score_ary=true)
+        @test eltype(status) == Int
         @test vtt.z == z # Check to see if the view is being written.
         @test count == fill(nt, n)
         @test tid == repeat([1:nt;]', 6)'
@@ -150,6 +151,13 @@ using Statistics
             1.0f0 1.0f0 1.0f0
         ]
         @test VTTrac.chk_zsub_peak_inside(vtt, zs_trough) == false
+
+        # to_missing=true with out_subimage=false or out_score_ary=false must not error
+        x0_v = vec(x0); y0_v = vec(y0); tid0_v = vec(tid0)
+        @test_nowarn VTTrac.trac(vtt, tid0_v, x0_v, y0_v, out_subimage=false, out_score_ary=false)
+        @test_nowarn VTTrac.trac(vtt, tid0_v, x0_v, y0_v, out_subimage=true,  out_score_ary=false)
+        @test_nowarn VTTrac.trac(vtt, tid0_v, x0_v, y0_v, out_subimage=false, out_score_ary=true)
+
     end
 
     @testset "VTTrack_with_mask" begin

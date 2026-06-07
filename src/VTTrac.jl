@@ -102,7 +102,7 @@ Setup for tracking.
 
 # Arguments
 - `o::VTT`: The object.
-- `nsx::Integer, nsy::Integer`: Submimage x & y sizes (x:1st, y:2nd dim).
+- `nsx::Integer, nsy::Integer`: Subimage x & y sizes (x:1st, y:2nd dim).
 - `vxhw::Union{Real, Nothing}, vyhw::Union{Real, Nothing}`: (either `v[xy]hw` or `i[xy]hw` are MANDATORY).
     the dimensions along which to perform the computation.
     search velocity range half sizes to set `i[xy]hw`.
@@ -113,7 +113,7 @@ Setup for tracking.
 - `subgrid::Bool=true`: Whether to conduct subgrid tracking.
 - `subgrid_gaus::Bool=true`: Whether subgrid peak finding is by gaussian.
 - `itstep::Integer=1`: Step of `t`'s used (skip if >1).
-- `ntrack::Integer=2`: Max tracking times from initial loc.
+- `ntrac::Integer=2`: Max tracking times from initial loc.
 - `score_method::String="xcor"`: `"xcor"` for cross-correlation, `"ncov"` for normalized covariance.
 - `Sth0::AbstractFloat=0.8`: The minimum score required for the 1st tracking.
 - `Sth1::AbstractFloat=0.7`: The minimum score required for subsequent tracking.
@@ -218,14 +218,12 @@ end
 """
     set_ixyhw_from_v(o, vxhw, vyhw)
 
-Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hh).
+Sets the tracking parameters `i[xy]hw` from velocities (v[xy]hw).
 
 # Arguments
 - `o::VTT`: The object.
 - `vxhw::Float64`: The range over which vx is searched around initial guess.
-- `vyhw`::Float64: The range over which vy is searched around initial guess.
-```
-
+- `vyhw::Float64`: The range over which vy is searched around initial guess.
 """
 function set_ixyhw_from_v(o::VTT, vxhw::Float64, vyhw::Float64)
     o.vxhw = vxhw
@@ -235,14 +233,14 @@ function set_ixyhw_from_v(o::VTT, vxhw::Float64, vyhw::Float64)
 end
 
 """
-    set_ixyhw_from_v(o, ixch, iyxh)
+    set_ixyhw_directly(o, ixhw, iyhw)
 
 Sets the tracking parameters `i[xy]hw`.
 
 # Arguments
 - `o::VTT`: The object.
-- `ixhw::Float64`: The range over which next x is searched around initial guess.
-- `iyhw`::Float64: The range over which next y is searched around initial guess.
+- `ixhw::Int`: The range over which next x is searched around initial guess.
+- `iyhw::Int`: The range over which next y is searched around initial guess.
 """
 function set_ixyhw_directly(o::VTT, ixhw::Int, iyhw::Int)
     o.ixhw = ixhw
@@ -298,9 +296,9 @@ Sets optional tracking parameters.
     it is peaked (max or min) inside, exceeding the max or min along the sides by the ratio specified by its value.
 - `Cth::Real`: An initial template is used only when 
     it has a difference in max and min greater than its value.
-- `vxch::Float64`: (Result screening parameter) If positive, tracking result is rejected if the vx 
-    chnages along trajecty greather than this value (thus used only when ntrac>=2). As a special case, 
-    if the result of the second tracking is rejected, the first one is also rejected, since there is 
+- `vxch::Float64`: (Result screening parameter) If positive, tracking result is rejected if the vx
+    changes along trajectory greater than this value (thus used only when ntrac>=2). As a special case,
+    if the result of the second tracking is rejected, the first one is also rejected, since there is
     no consecutive consistent result in this case.
 - `vych::Float64`: (Result screening parameter) As vxch but for the y-component.
 - `min_samples::Int`: Minimum number of visible values to calculate score when `chk_mask` is true.
@@ -698,9 +696,9 @@ end
 """
     sliding_ncov(o, sigx, xd, tid, k0, k1, l0, l1)
 
-Sliding normalized covariance between the sugimage and image at `tid`.
+Sliding normalized covariance between the subimage and image at `tid`.
 
-Normalization is done by the sigma of the fist image : cov(x',y')/sigx^2
+Normalization is done by the sigma of the first image : cov(x',y')/sigx^2
 (in contrast to cov(x',y')/sigx/sigy in the correlation coefficient).
 
 # Returns
@@ -978,7 +976,7 @@ function find_subgrid_peak_5pt_gaus(c::Real, l::Real, r::Real, b::Real, t::Real)
     r = log(r) - c
     b = log(b) - c
     t = log(t) - c
-    stat = !( l<=0.0 && r<=0.0 && b<=0.0 && t<=0.0 && ( l<0.0 || r<0.0 ) && ( b<0.0 || t<=0.0) )
+    stat = !( l<=0.0 && r<=0.0 && b<=0.0 && t<=0.0 && ( l<0.0 || r<0.0 ) && ( b<0.0 || t<0.0) )
     if stat
         return stat, nothing, nothing, nothing
     end
@@ -1056,7 +1054,7 @@ end
 Conduct tracking.
 
 # Arguments
-- `o::VTT`: The traking oject.
+- `o::VTT`: The tracking object.
 - `tid::Array{Integer,Any}`: Tracking initial time indices.
 - `x::Array{Float64,Any}`: Tracking initial template-center x location (index-based; non-integer for subgrid).
 - `y::Array{Float64,Any}`: Tracking initial template-center y location (index-based; non-integer for subgrid).
@@ -1119,10 +1117,14 @@ function trac(o::VTT, tid, x, y; vxg=nothing, vyg=nothing, out_subimage::Bool=fa
         vy[vy.==fmiss] .= missing
         score = Array{Union{Missing, Float32},2}(score)
         score[score.==fmiss] .= missing
-        zss = Array{Union{Missing, Float32},4}(zss)
-        zss[zss.==o.zmiss] .= missing
-        score_ary = Array{Union{Missing, Float32},4}(score_ary)
-        score_ary[score_ary.==Float32(fmiss)] .= missing
+        if !isnothing(zss)
+            zss = Array{Union{Missing, Float32},4}(zss)
+            zss[zss.==o.zmiss] .= missing
+        end
+        if !isnothing(score_ary)
+            score_ary = Array{Union{Missing, Float32},4}(score_ary)
+            score_ary[score_ary.==Float32(fmiss)] .= missing
+        end
     end
 
     if length(sh) >= 2
@@ -1152,7 +1154,7 @@ end
 Conduct tracking (core).
 
 # Arguments
-- `o::VTT`: The traking oject.
+- `o::VTT`: The tracking object.
 - `tid0::Vector{Integer}`: Tracking initial time indices.
 - `x0::Vector{Float64}`: Tracking initial template-center x location (index-based; non-integer for subgrid).
 - `y0::Vector{Float64}`: Tracking initial template-center y location (index-based; non-integer for subgrid).
@@ -1215,7 +1217,7 @@ function do_tracking(o::VTT, tid0, x0, y0, vx0, vy0, out_subimage::Bool, out_sco
     itstep = o.itstep
     chk_vchange = (o.vxch > 0.0 && o.vych > 0.0)
 
-    status = zeros(len)
+    status = zeros(Int, len)
 
     # record initial data
     if o.subgrid # initial position
