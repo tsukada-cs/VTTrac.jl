@@ -1,7 +1,7 @@
 name = "VTTrac"
 uuid = "a95e085e-b118-4c2b-a00a-78cb3dcd4dd8"
 authors = ["tsukada-cs <tsukada.cs@gmail.com> and contributors"]
-version = "0.5.3"
+version = "1.0.0"
 
 [deps]
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -10,7 +10,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
 Statistics = "1"
-julia = "1.7"
+julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
