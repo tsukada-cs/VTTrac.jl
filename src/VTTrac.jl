@@ -1004,7 +1004,14 @@ end
 """
     find_score_peak(o, scr, kw, lw)
 
-Find the score peak and its location.
+Find the maximum score and its subgrid location in the score matrix `scr`.
+
+If the maximum score is located at the boundary of the matrix, subgrid interpolation
+cannot be performed. In this case, the function returns the integer coordinates of
+the maximum and sets `stat` to `true`. For interior peaks, a 5-point Gaussian
+interpolation is applied. If the interpolation is successful, `stat` is `false` and
+the subgrid coordinates are returned. If interpolation fails, `stat` is set to `true`.
+
 
 # Returns
 - `stat::Bool`: `false` if the peak is inside; `true` if not.
