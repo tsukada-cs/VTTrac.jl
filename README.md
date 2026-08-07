@@ -16,6 +16,26 @@ using Pkg
 Pkg.add("VTTrac")
 ```
 
+## Quick start
+
+```julia
+using VTTrac
+
+# z: image time series, Float32, sized [time, y, x], at least 2 time steps
+vtt = VTT(z)
+
+# nsx, nsy: template size; vxhw, vyhw: expected velocity range to search around
+setup(vtt, 5, 5; vxhw=2.0, vyhw=2.0, ntrac=5)
+
+# tid0, x0, y0: initial time index / (x, y) position of each template to track
+count, status, tid, x, y, vx, vy, score = trac(vtt, tid0, x0, y0)
+```
+
+`count[m]` is how many trajectory points succeeded for the `m`-th template, and
+`status[m]` says why it stopped otherwise. See the
+[How to Use](https://tsukada-cs.github.io/VTTrac.jl/dev/howtouse/) page for a full
+walkthrough, including masking and result-screening options.
+
 ## Documentation
 Documenter.jl generated documentation:
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://tsukada-cs.github.io/VTTrac.jl/stable)
